@@ -8,7 +8,7 @@ import * as ed25519 from "@noble/ed25519";
 ed25519.etc.sha512Sync = (...msgs) => sha512(...msgs);
 
 // Dynamic import since the SDK ships ESM
-const { verifyReceipt, verifyLedger, createVerdictV1, hexToBytes, bytesToHex, hashContent } = await import("../dist/index.mjs");
+const { verifyReceipt, verifyLedger, createVerdictV1, hexToBytes, bytesToHex, hashContent, getPublicKey, parseLedger } = await import("../dist/index.mjs");
 
 // Test keypair (ephemeral — for tests only)
 const TEST_PRIV = "0101010101010101010101010101010101010101010101010101010101010101";
@@ -157,6 +157,68 @@ describe("VARP SDK — @os1221/varp", () => {
     it("round-trips all-zeros", () => {
       const original = "00".repeat(32);
       assert.equal(bytesToHex(hexToBytes(original)), original);
+    });
+  });
+
+  describe("getPublicKey", () => {
+    it("returns 64-char hex public key for known private key", async () => {
+      const pub = await getPublicKey(TEST_PRIV);
+      assert.equal(typeof pub, "string");
+      assert.equal(pub.length, 64);
+      assert.match(pub, /^[0-9a-f]+$/);
+    });
+
+    it("is deterministic — same private key always yields same public key", async () => {
+      const pub1 = await getPublicKey(TEST_PRIV);
+      const pub2 = await getPublicKey(TEST_PRIV);
+      assert.equal(pub1, pub2);
+    });
+
+    it("different private keys yield different public keys", async () => {
+      const privB = "0202020202020202020202020202020202020202020202020202020202020202";
+      const pub1 = await getPublicKey(TEST_PRIV);
+      const pub2 = await getPublicKey(privB);
+      assert.notEqual(pub1, pub2);
+    });
+
+    it("public key from getPublicKey matches signer_pubkey in receipt", async () => {
+      const pub = await getPublicKey(TEST_PRIV);
+      assert.equal(sampleReceipt.verdict.signer_pubkey, pub);
+    });
+  });
+
+  describe("parseLedger", () => {
+    it("parses single-entry JSONL string", async () => {
+      const line = JSON.stringify(sampleReceipt);
+      const entries = parseLedger(line);
+      assert.equal(entries.length, 1);
+      assert.ok(entries[0].verdict, "should have verdict field");
+    });
+
+    it("parses multi-entry JSONL string", async () => {
+      const r1 = await createVerdictV1({ agent: "A1", description: "first", privateKeyHex: TEST_PRIV });
+      const r2 = await createVerdictV1({ agent: "A2", description: "second", privateKeyHex: TEST_PRIV });
+      const jsonl = [r1, r2].map(r => JSON.stringify(r)).join("\n");
+      const entries = parseLedger(jsonl);
+      assert.equal(entries.length, 2);
+      assert.equal(entries[0].verdict.agent, "A1");
+      assert.equal(entries[1].verdict.agent, "A2");
+    });
+
+    it("skips malformed lines silently", () => {
+      const jsonl = '{"verdict":{}}\n{bad json\n{"verdict":{"agent":"ok"}}';
+      const entries = parseLedger(jsonl);
+      assert.equal(entries.length, 2);
+    });
+
+    it("returns empty array for empty string", () => {
+      assert.deepEqual(parseLedger(""), []);
+    });
+
+    it("handles trailing newline without error", async () => {
+      const jsonl = JSON.stringify(sampleReceipt) + "\n";
+      const entries = parseLedger(jsonl);
+      assert.equal(entries.length, 1);
     });
   });
 });
