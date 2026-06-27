@@ -1,0 +1,45 @@
+{
+  "name": "@os1221/varp",
+  "version": "1.0.0",
+  "description": "Verifiable AI Receipt Protocol (VARP) — Ed25519 + BLAKE3 + JCS signed receipts for AI provenance. EU AI Act Article 13 compliance.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm && node scripts/gen-dts.js",
+    "test": "node --test src/*.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai-receipt", "varp", "ed25519", "blake3", "jcs", "verdict",
+    "verifiable-ai", "provenance", "audit-trail", "eu-ai-act",
+    "receipts-not-vibes", "cryptographic", "ledger"
+  ],
+  "author": "Omair Shahid <omairshahid21@gmail.com> (https://os1221.com)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/os1221/varp-sdk"
+  },
+  "homepage": "https://os1221.com/verdict",
+  "funding": "https://os1221.com",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@noble/ed25519": "^2.3.0",
+    "@noble/hashes": "^1.8.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": ["dist", "README.md", "LICENSE"]
+}
