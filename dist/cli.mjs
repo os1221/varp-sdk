@@ -126,6 +126,97 @@ ${ok ? "\u2713" : "\u2717"} ${lines.length} entries, ${breaks} chain break(s)`);
       console.log(JSON.stringify(receipt, null, 2));
       break;
     }
+    case "summarize": {
+      const path = args[0];
+      if (!path) {
+        die("Usage: varp summarize <ledger.jsonl>");
+      }
+      const text = readFileSync(path, "utf8");
+      const lines = text.split("\n").filter((l) => l.trim());
+      const agentCounts = {};
+      let firstTs = "";
+      let lastTs = "";
+      let parseErrors = 0;
+      let noVerdict = 0;
+      for (const line of lines) {
+        let entry;
+        try {
+          entry = JSON.parse(line);
+        } catch {
+          parseErrors++;
+          continue;
+        }
+        const v = entry.verdict;
+        if (!v) {
+          noVerdict++;
+          continue;
+        }
+        let agent;
+        let ts;
+        if (v.agent) {
+          agent = String(v.agent);
+          ts = String(v.timestamp ?? "");
+        } else if (v.event && typeof v.event === "object") {
+          const desc = String(v.event.description ?? "");
+          const match = desc.match(/^\[([^\]]+)\]/);
+          agent = match ? match[1] : "unknown";
+          ts = String(v.event.timestamp ?? "");
+        } else {
+          agent = "unknown";
+          ts = "";
+        }
+        agentCounts[agent] = (agentCounts[agent] ?? 0) + 1;
+        if (ts && (!firstTs || ts < firstTs)) firstTs = ts;
+        if (ts && ts > lastTs) lastTs = ts;
+      }
+      const totalValid = Object.values(agentCounts).reduce((a, b) => a + b, 0);
+      const topAgents = Object.entries(agentCounts).sort(([, a], [, b]) => b - a).slice(0, 10);
+      console.log(`
+=== Ledger Summary: ${path} ===`);
+      console.log(`  Total lines:    ${lines.length}`);
+      console.log(`  Valid receipts: ${totalValid}`);
+      console.log(`  Unique agents:  ${Object.keys(agentCounts).length}`);
+      if (parseErrors) console.log(`  Parse errors:   ${parseErrors}`);
+      if (noVerdict) console.log(`  No-verdict:     ${noVerdict}`);
+      console.log(`  Earliest:       ${firstTs || "\u2014"}`);
+      console.log(`  Latest:         ${lastTs || "\u2014"}`);
+      console.log(`
+  Top agents by receipt count:`);
+      for (const [agent, count] of topAgents) {
+        const pct = Math.round(count / totalValid * 100);
+        const bar = "\u2588".repeat(Math.round(pct / 5));
+        console.log(`    ${agent.padEnd(28)} ${String(count).padStart(6)} ${bar} (${pct}%)`);
+      }
+      if (Object.keys(agentCounts).length > 10) {
+        console.log(`    \u2026 and ${Object.keys(agentCounts).length - 10} more agent(s)`);
+      }
+      process.exit(0);
+    }
+    case "keygen": {
+      const ed = await import("@noble/ed25519");
+      if (!ed.etc.sha512Sync) {
+        try {
+          const { createHash } = await import("crypto");
+          ed.etc.sha512Sync = (...msgs) => {
+            const h = createHash("sha512");
+            for (const m of msgs) h.update(m);
+            return h.digest();
+          };
+        } catch {
+        }
+      }
+      const { randomBytes } = await import("crypto");
+      const privBytes = randomBytes(32);
+      const pubBytes = ed.getPublicKey(privBytes);
+      const privHex = privBytes.toString("hex");
+      const pubHex = Buffer.from(pubBytes).toString("hex");
+      console.log(`private_key: ${privHex}`);
+      console.log(`public_key:  ${pubHex}`);
+      console.log(`
+Usage: varp sign --agent MyAgent --desc "task done" --key ${privHex}`);
+      console.log(`Verify authorship: publish public_key at your domain and compare with signer_pubkey in receipts.`);
+      break;
+    }
     case "hash": {
       const text = args.join(" ");
       if (!text) {
@@ -153,8 +244,10 @@ Commands:
   varp verify <receipt.json>        Verify a single VERDICT/v1 receipt
   varp verify-ledger <ledger.jsonl> Verify all receipts in a JSONL ledger
   varp chain-report <ledger.jsonl>  Check prev_hash chain linkage (chain integrity audit)
+  varp summarize <ledger.jsonl>     Show receipt count, agents, date range, top agents
   varp sign --agent <name> --desc <text> --key <hex64>
                                     Create and sign a new VERDICT/v1 receipt
+  varp keygen                       Generate a fresh Ed25519 keypair
   varp hash <text>                  BLAKE3(text) \u2192 hex
   varp version                      Print version and exit
   varp help                         Show this message

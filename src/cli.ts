@@ -117,6 +117,63 @@ async function main() {
       break;
     }
 
+    case "summarize": {
+      const path = args[0];
+      if (!path) { die("Usage: varp summarize <ledger.jsonl>"); }
+      const text = readFileSync(path, "utf8");
+      const lines = text.split("\n").filter((l) => l.trim());
+      const agentCounts: Record<string, number> = {};
+      let firstTs = "";
+      let lastTs = "";
+      let parseErrors = 0;
+      let noVerdict = 0;
+      for (const line of lines) {
+        let entry;
+        try { entry = JSON.parse(line); } catch { parseErrors++; continue; }
+        const v = entry.verdict;
+        if (!v) { noVerdict++; continue; }
+        // Handle VERDICT/v1 SDK format (v.agent) and omega-receipts format (v.event.description)
+        let agent: string;
+        let ts: string;
+        if (v.agent) {
+          agent = String(v.agent);
+          ts = String(v.timestamp ?? "");
+        } else if (v.event && typeof v.event === "object") {
+          // omega-receipts: extract agent from "[AgentName] description" pattern
+          const desc = String((v.event as Record<string, unknown>).description ?? "");
+          const match = desc.match(/^\[([^\]]+)\]/);
+          agent = match ? match[1] : "unknown";
+          ts = String((v.event as Record<string, unknown>).timestamp ?? "");
+        } else {
+          agent = "unknown";
+          ts = "";
+        }
+        agentCounts[agent] = (agentCounts[agent] ?? 0) + 1;
+        if (ts && (!firstTs || ts < firstTs)) firstTs = ts;
+        if (ts && ts > lastTs) lastTs = ts;
+      }
+      const totalValid = Object.values(agentCounts).reduce((a, b) => a + b, 0);
+      const topAgents = Object.entries(agentCounts).sort(([, a], [, b]) => b - a).slice(0, 10);
+      console.log(`\n=== Ledger Summary: ${path} ===`);
+      console.log(`  Total lines:    ${lines.length}`);
+      console.log(`  Valid receipts: ${totalValid}`);
+      console.log(`  Unique agents:  ${Object.keys(agentCounts).length}`);
+      if (parseErrors) console.log(`  Parse errors:   ${parseErrors}`);
+      if (noVerdict) console.log(`  No-verdict:     ${noVerdict}`);
+      console.log(`  Earliest:       ${firstTs || "—"}`);
+      console.log(`  Latest:         ${lastTs || "—"}`);
+      console.log(`\n  Top agents by receipt count:`);
+      for (const [agent, count] of topAgents) {
+        const pct = Math.round((count / totalValid) * 100);
+        const bar = "█".repeat(Math.round(pct / 5));
+        console.log(`    ${agent.padEnd(28)} ${String(count).padStart(6)} ${bar} (${pct}%)`);
+      }
+      if (Object.keys(agentCounts).length > 10) {
+        console.log(`    … and ${Object.keys(agentCounts).length - 10} more agent(s)`);
+      }
+      process.exit(0);
+    }
+
     case "keygen": {
       const ed = await import("@noble/ed25519");
       if (!ed.etc.sha512Sync) {
@@ -169,6 +226,7 @@ Commands:
   varp verify <receipt.json>        Verify a single VERDICT/v1 receipt
   varp verify-ledger <ledger.jsonl> Verify all receipts in a JSONL ledger
   varp chain-report <ledger.jsonl>  Check prev_hash chain linkage (chain integrity audit)
+  varp summarize <ledger.jsonl>     Show receipt count, agents, date range, top agents
   varp sign --agent <name> --desc <text> --key <hex64>
                                     Create and sign a new VERDICT/v1 receipt
   varp keygen                       Generate a fresh Ed25519 keypair

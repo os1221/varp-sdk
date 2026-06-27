@@ -170,6 +170,35 @@ describe("varp CLI", () => {
     });
   });
 
+  describe("summarize", () => {
+    const TEST_KEY = "0101010101010101010101010101010101010101010101010101010101010101";
+
+    it("prints header and top agents for a multi-entry ledger", () => {
+      const tmp = mkdtempSync(join(tmpdir(), "varp-sum-"));
+      const r1 = run(["sign", "--agent", "AgentA", "--desc", "first", "--key", TEST_KEY]);
+      const r2 = run(["sign", "--agent", "AgentA", "--desc", "second", "--key", TEST_KEY]);
+      const r3 = run(["sign", "--agent", "AgentB", "--desc", "other", "--key", TEST_KEY]);
+      const ledger = join(tmp, "ledger.jsonl");
+      writeFileSync(ledger, [
+        JSON.stringify(JSON.parse(r1.stdout)),
+        JSON.stringify(JSON.parse(r2.stdout)),
+        JSON.stringify(JSON.parse(r3.stdout)),
+      ].join("\n") + "\n");
+      const rs = run(["summarize", ledger]);
+      assert.equal(rs.status, 0, `exit ${rs.status}: ${rs.stderr}`);
+      assert.match(rs.stdout, /Total lines:\s+3/);
+      assert.match(rs.stdout, /Unique agents:\s+2/);
+      assert.match(rs.stdout, /AgentA/);
+      assert.match(rs.stdout, /AgentB/);
+      rmSync(tmp, { recursive: true });
+    });
+
+    it("help shows summarize", () => {
+      const r = run(["help"]);
+      assert.match(r.stdout, /summarize/);
+    });
+  });
+
   describe("keygen", () => {
     it("prints private_key and public_key in hex", () => {
       const r = run(["keygen"]);
