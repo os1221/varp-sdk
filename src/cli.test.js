@@ -170,6 +170,43 @@ describe("varp CLI", () => {
     });
   });
 
+  describe("keygen", () => {
+    it("prints private_key and public_key in hex", () => {
+      const r = run(["keygen"]);
+      assert.equal(r.status, 0, `exit ${r.status}: ${r.stderr}`);
+      assert.match(r.stdout, /private_key: [0-9a-f]{64}/);
+      assert.match(r.stdout, /public_key:  [0-9a-f]{64}/);
+    });
+
+    it("each call generates a different key", () => {
+      const r1 = run(["keygen"]);
+      const r2 = run(["keygen"]);
+      const priv1 = r1.stdout.match(/private_key: ([0-9a-f]{64})/)?.[1];
+      const priv2 = r2.stdout.match(/private_key: ([0-9a-f]{64})/)?.[1];
+      assert.ok(priv1 && priv2 && priv1 !== priv2, "keys must be unique");
+    });
+
+    it("generated key can be used to sign and verify", () => {
+      const rk = run(["keygen"]);
+      const privKey = rk.stdout.match(/private_key: ([0-9a-f]{64})/)?.[1];
+      assert.ok(privKey, "expected private key");
+      const tmp = mkdtempSync(join(tmpdir(), "varp-keygen-"));
+      const rs = run(["sign", "--agent", "KeygenTest", "--desc", "generated-key", "--key", privKey]);
+      assert.equal(rs.status, 0);
+      const path = join(tmp, "receipt.json");
+      writeFileSync(path, rs.stdout);
+      const rv = run(["verify", path]);
+      assert.equal(rv.status, 0, `verify failed: ${rv.stderr}`);
+      assert.match(rv.stdout, /verified/);
+      rmSync(tmp, { recursive: true });
+    });
+
+    it("help shows keygen", () => {
+      const r = run(["help"]);
+      assert.match(r.stdout, /keygen/);
+    });
+  });
+
   describe("chain-report", () => {
     const TEST_KEY = "0101010101010101010101010101010101010101010101010101010101010101";
 

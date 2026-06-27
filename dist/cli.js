@@ -284,6 +284,31 @@ ${ok ? "\u2713" : "\u2717"} ${lines.length} entries, ${breaks} chain break(s)`);
       console.log(JSON.stringify(receipt, null, 2));
       break;
     }
+    case "keygen": {
+      const ed = await import("@noble/ed25519");
+      if (!ed.etc.sha512Sync) {
+        try {
+          const { createHash } = await import("crypto");
+          ed.etc.sha512Sync = (...msgs) => {
+            const h = createHash("sha512");
+            for (const m of msgs) h.update(m);
+            return h.digest();
+          };
+        } catch {
+        }
+      }
+      const { randomBytes } = await import("crypto");
+      const privBytes = randomBytes(32);
+      const pubBytes = ed.getPublicKey(privBytes);
+      const privHex = privBytes.toString("hex");
+      const pubHex = Buffer.from(pubBytes).toString("hex");
+      console.log(`private_key: ${privHex}`);
+      console.log(`public_key:  ${pubHex}`);
+      console.log(`
+Usage: varp sign --agent MyAgent --desc "task done" --key ${privHex}`);
+      console.log(`Verify authorship: publish public_key at your domain and compare with signer_pubkey in receipts.`);
+      break;
+    }
     case "hash": {
       const text = args.join(" ");
       if (!text) {
@@ -313,6 +338,7 @@ Commands:
   varp chain-report <ledger.jsonl>  Check prev_hash chain linkage (chain integrity audit)
   varp sign --agent <name> --desc <text> --key <hex64>
                                     Create and sign a new VERDICT/v1 receipt
+  varp keygen                       Generate a fresh Ed25519 keypair
   varp hash <text>                  BLAKE3(text) \u2192 hex
   varp version                      Print version and exit
   varp help                         Show this message
