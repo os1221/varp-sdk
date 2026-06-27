@@ -8,7 +8,7 @@ import * as ed25519 from "@noble/ed25519";
 ed25519.etc.sha512Sync = (...msgs) => sha512(...msgs);
 
 // Dynamic import since the SDK ships ESM
-const { verifyReceipt, verifyLedger, createVerdictV1, hexToBytes, bytesToHex } = await import("../dist/index.mjs");
+const { verifyReceipt, verifyLedger, createVerdictV1, hexToBytes, bytesToHex, hashContent } = await import("../dist/index.mjs");
 
 // Test keypair (ephemeral — for tests only)
 const TEST_PRIV = "0101010101010101010101010101010101010101010101010101010101010101";
@@ -121,6 +121,30 @@ describe("VARP SDK — @os1221/varp", () => {
       const result = await verifyLedger(jsonl);
       assert.equal(result.results[0].verified, false);
       assert.equal(result.results[1].verified, true);
+    });
+  });
+
+  describe("hashContent", () => {
+    it("returns 64 hex chars (BLAKE3-256)", async () => {
+      const hex = await hashContent("receipts not vibes");
+      assert.match(hex, /^[0-9a-f]{64}$/);
+    });
+
+    it("is deterministic — same input, same hash", async () => {
+      const h1 = await hashContent("deterministic");
+      const h2 = await hashContent("deterministic");
+      assert.equal(h1, h2);
+    });
+
+    it("is sensitive — one char change produces different hash", async () => {
+      const h1 = await hashContent("receipts not vibes");
+      const h2 = await hashContent("receipts not vibeS");
+      assert.notEqual(h1, h2);
+    });
+
+    it("known vector: BLAKE3('receipts not vibes')", async () => {
+      const hex = await hashContent("receipts not vibes");
+      assert.equal(hex, "f38f885d7d1bfb8f404c1e1974c07f959a47449e5abe09b18575fbd35e8a1e7d");
     });
   });
 

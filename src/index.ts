@@ -230,4 +230,12 @@ export function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * Hash arbitrary text content with BLAKE3, returning hex.
+ * Convenience wrapper around blake3Hex for string inputs.
+ */
+export async function hashContent(text: string): Promise<string> {
+  return blake3Hex(new TextEncoder().encode(text));
+}
+
 export { jcsStringify, blake3Hex };

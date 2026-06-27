@@ -33,6 +33,7 @@ __export(index_exports, {
   blake3Hex: () => blake3Hex,
   bytesToHex: () => bytesToHex,
   createVerdictV1: () => createVerdictV1,
+  hashContent: () => hashContent,
   hexToBytes: () => hexToBytes,
   jcsStringify: () => jcsStringify,
   verifyLedger: () => verifyLedger,
@@ -160,11 +161,15 @@ function hexToBytes(hex) {
 function bytesToHex(bytes) {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
+async function hashContent(text) {
+  return blake3Hex(new TextEncoder().encode(text));
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   blake3Hex,
   bytesToHex,
   createVerdictV1,
+  hashContent,
   hexToBytes,
   jcsStringify,
   verifyLedger,
