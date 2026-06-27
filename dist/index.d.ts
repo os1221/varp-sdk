@@ -44,5 +44,8 @@ export declare function verifyLedger(jsonlText: string): Promise<{
 export declare function createVerdictV1(opts: SignOptions): Promise<LedgerLine>;
 export declare function hexToBytes(hex: string): Uint8Array;
 export declare function bytesToHex(bytes: Uint8Array): string;
+export declare function hashContent(text: string): Promise<string>;
+export declare function getPublicKey(privateKeyHex: string): Promise<string>;
+export declare function parseLedger(text: string): LedgerLine[];
 export declare function jcsStringify(val: unknown): string;
 export declare function blake3Hex(data: Uint8Array): Promise<string>;

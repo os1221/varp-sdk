@@ -251,3 +251,39 @@ export async function hashContent(text: string): Promise<string> {
 }
 
 export { jcsStringify, blake3Hex };
+
+/**
+ * Derive the Ed25519 public key from a private key seed hex string.
+ * Useful for displaying the public key that corresponds to your signing key
+ * without needing to create a receipt.
+ */
+export async function getPublicKey(privateKeyHex: string): Promise<string> {
+  const ed = await import("@noble/ed25519");
+  if (!ed.etc.sha512Sync) {
+    try {
+      const { createHash } = await import("node:crypto");
+      ed.etc.sha512Sync = (...msgs: Uint8Array[]) => {
+        const h = createHash("sha512");
+        for (const m of msgs) h.update(m);
+        return h.digest();
+      };
+    } catch { /* browser */ }
+  }
+  const privBytes = hexToBytes(privateKeyHex);
+  const pubBytes = ed.getPublicKey(privBytes);
+  return bytesToHex(pubBytes);
+}
+
+/**
+ * Parse a JSONL ledger string into an array of structured LedgerLine objects.
+ * Lines that fail to parse are skipped. Use verifyLedger() to check
+ * cryptographic validity of the returned receipts.
+ */
+export function parseLedger(text: string): LedgerLine[] {
+  return text
+    .split("\n")
+    .filter((l) => l.trim())
+    .flatMap((line) => {
+      try { return [JSON.parse(line) as LedgerLine]; } catch { return []; }
+    });
+}
