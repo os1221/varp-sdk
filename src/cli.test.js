@@ -122,4 +122,51 @@ describe("varp CLI", () => {
       rmSync(tmp, { recursive: true });
     });
   });
+
+  describe("sign", () => {
+    const TEST_KEY = "0101010101010101010101010101010101010101010101010101010101010101";
+
+    it("sign produces valid JSON with verdict field", () => {
+      const r = run(["sign", "--agent", "CLIAgent", "--desc", "cli sign test", "--key", TEST_KEY]);
+      assert.equal(r.status, 0, `exit ${r.status}: ${r.stderr}`);
+      const parsed = JSON.parse(r.stdout);
+      assert.ok(parsed.verdict, "must have verdict field");
+      assert.equal(parsed.verdict.agent, "CLIAgent");
+      assert.equal(parsed.verdict.description, "cli sign test");
+      assert.equal(parsed.verdict.delta_sv, 0.1);
+    });
+
+    it("sign --sv sets delta_sv", () => {
+      const r = run(["sign", "--agent", "A", "--desc", "d", "--key", TEST_KEY, "--sv", "0.5"]);
+      assert.equal(r.status, 0);
+      const parsed = JSON.parse(r.stdout);
+      assert.equal(parsed.verdict.delta_sv, 0.5);
+    });
+
+    it("sign output verifies correctly", () => {
+      const tmp = mkdtempSync(join(tmpdir(), "varp-sign-"));
+      const r = run(["sign", "--agent", "A", "--desc", "round-trip", "--key", TEST_KEY]);
+      const path = join(tmp, "signed.json");
+      writeFileSync(path, r.stdout);
+      const v = run(["verify", path]);
+      assert.equal(v.status, 0, `verify failed: ${v.stderr}`);
+      assert.match(v.stdout, /verified/);
+      rmSync(tmp, { recursive: true });
+    });
+
+    it("sign errors without --agent", () => {
+      const r = run(["sign", "--desc", "d", "--key", TEST_KEY]);
+      assert.notEqual(r.status, 0, "should fail without --agent");
+    });
+
+    it("sign errors without --key and no env", () => {
+      const r = run(["sign", "--agent", "A", "--desc", "d"], { env: { ...process.env, VARP_PRIVATE_KEY: "" } });
+      assert.notEqual(r.status, 0, "should fail without key");
+    });
+
+    it("help shows sign command", () => {
+      const r = run(["help"]);
+      assert.match(r.stdout, /sign.*--agent.*--desc/s);
+    });
+  });
 });

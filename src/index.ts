@@ -180,7 +180,19 @@ export interface SignOptions {
  * privateKeyHex: 64-char hex Ed25519 seed (first 32 bytes of keypair).
  */
 export async function createVerdictV1(opts: SignOptions): Promise<LedgerLine> {
-  const { sign, getPublicKey } = await import("@noble/ed25519");
+  const ed = await import("@noble/ed25519");
+  // Noble/ed25519 requires sha512Sync in non-browser environments
+  if (!ed.etc.sha512Sync) {
+    try {
+      const { createHash } = await import("node:crypto");
+      ed.etc.sha512Sync = (...msgs: Uint8Array[]) => {
+        const h = createHash("sha512");
+        for (const m of msgs) h.update(m);
+        return h.digest();
+      };
+    } catch { /* browser env — async only */ }
+  }
+  const { sign, getPublicKey } = ed;
   const privBytes = hexToBytes(opts.privateKeyHex);
   const pubBytes = getPublicKey(privBytes);
   const pubHex = bytesToHex(pubBytes);

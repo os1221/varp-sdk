@@ -107,6 +107,50 @@ async function verifyLedger(jsonlText) {
   const chain_valid = results.every((r) => r.verified);
   return { results, chain_valid };
 }
+async function createVerdictV1(opts) {
+  const ed = await import("@noble/ed25519");
+  if (!ed.etc.sha512Sync) {
+    try {
+      const { createHash } = await import("crypto");
+      ed.etc.sha512Sync = (...msgs) => {
+        const h = createHash("sha512");
+        for (const m of msgs) h.update(m);
+        return h.digest();
+      };
+    } catch {
+    }
+  }
+  const { sign, getPublicKey } = ed;
+  const privBytes = hexToBytes(opts.privateKeyHex);
+  const pubBytes = getPublicKey(privBytes);
+  const pubHex = bytesToHex(pubBytes);
+  const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+  const payload = {
+    agent: opts.agent,
+    description: opts.description,
+    timestamp,
+    delta_sv: opts.delta_sv ?? 0.1,
+    ...opts.evidence_root ? { evidence_root: opts.evidence_root } : {}
+  };
+  const canonical = jcsStringify(payload);
+  const event_hash = await blake3Hex(new TextEncoder().encode(canonical));
+  const sigBytes = await sign(new TextEncoder().encode(event_hash), privBytes);
+  const signature = bytesToHex(sigBytes);
+  return {
+    verdict: {
+      event_hash,
+      signature,
+      signer_pubkey: pubHex,
+      ...opts.prevHash ? { prev_hash: opts.prevHash } : {},
+      timestamp,
+      delta_sv: opts.delta_sv ?? 0.1,
+      description: opts.description,
+      agent: opts.agent,
+      chain_valid: true,
+      content_valid: true
+    }
+  };
+}
 function hexToBytes(hex) {
   const h = hex.startsWith("0x") ? hex.slice(2) : hex;
   const bytes = new Uint8Array(h.length / 2);
@@ -114,6 +158,9 @@ function hexToBytes(hex) {
     bytes[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
   }
   return bytes;
+}
+function bytesToHex(bytes) {
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 async function hashContent(text) {
   return blake3Hex(new TextEncoder().encode(text));
@@ -170,6 +217,29 @@ async function main() {
 ${chain_valid ? "\u2713" : "\u2717"} ${passed}/${results.length} verified \u2014 chain_valid: ${chain_valid}`);
       process.exit(chain_valid ? 0 : 1);
     }
+    case "sign": {
+      const getFlag = (f) => {
+        const i = args.indexOf(f);
+        return i >= 0 ? args[i + 1] : void 0;
+      };
+      const agent = getFlag("--agent");
+      const desc = getFlag("--desc");
+      const key = getFlag("--key") ?? process.env.VARP_PRIVATE_KEY;
+      const sv = parseFloat(getFlag("--sv") ?? "0.1");
+      const prevHash = getFlag("--prev-hash");
+      if (!agent) {
+        die("Usage: varp sign --agent <name> --desc <text> --key <hex64> [--sv 0.1] [--prev-hash <hex>]");
+      }
+      if (!desc) {
+        die("Usage: varp sign --agent <name> --desc <text> --key <hex64> [--sv 0.1] [--prev-hash <hex>]");
+      }
+      if (!key) {
+        die("Provide --key <hex64> or set VARP_PRIVATE_KEY env var");
+      }
+      const receipt = await createVerdictV1({ agent, description: desc, privateKeyHex: key, delta_sv: sv, prevHash });
+      console.log(JSON.stringify(receipt, null, 2));
+      break;
+    }
     case "hash": {
       const text = args.join(" ");
       if (!text) {
@@ -196,9 +266,16 @@ varp \u2014 Verifiable AI Receipt Protocol CLI
 Commands:
   varp verify <receipt.json>        Verify a single VERDICT/v1 receipt
   varp verify-ledger <ledger.jsonl> Verify all receipts in a JSONL ledger
+  varp sign --agent <name> --desc <text> --key <hex64>
+                                    Create and sign a new VERDICT/v1 receipt
   varp hash <text>                  BLAKE3(text) \u2192 hex
   varp version                      Print version and exit
   varp help                         Show this message
+
+Sign flags:
+  --key <hex64>    Ed25519 private key seed (or set VARP_PRIVATE_KEY env)
+  --sv <float>     Delta SV value (default: 0.1)
+  --prev-hash <h>  Previous receipt hash for chain linking
 
 Flags: --help / -h  Show this message
 

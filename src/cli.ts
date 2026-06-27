@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { verifyReceipt, verifyLedger, hashContent } from "./index.js";
+import { verifyReceipt, verifyLedger, hashContent, createVerdictV1 } from "./index.js";
 
 function getVersion(): string {
   try {
@@ -66,6 +66,24 @@ async function main() {
       process.exit(chain_valid ? 0 : 1);
     }
 
+    case "sign": {
+      const getFlag = (f: string) => {
+        const i = args.indexOf(f);
+        return i >= 0 ? args[i + 1] : undefined;
+      };
+      const agent = getFlag("--agent");
+      const desc = getFlag("--desc");
+      const key = getFlag("--key") ?? process.env.VARP_PRIVATE_KEY;
+      const sv = parseFloat(getFlag("--sv") ?? "0.1");
+      const prevHash = getFlag("--prev-hash");
+      if (!agent) { die("Usage: varp sign --agent <name> --desc <text> --key <hex64> [--sv 0.1] [--prev-hash <hex>]"); }
+      if (!desc) { die("Usage: varp sign --agent <name> --desc <text> --key <hex64> [--sv 0.1] [--prev-hash <hex>]"); }
+      if (!key) { die("Provide --key <hex64> or set VARP_PRIVATE_KEY env var"); }
+      const receipt = await createVerdictV1({ agent, description: desc, privateKeyHex: key, delta_sv: sv, prevHash });
+      console.log(JSON.stringify(receipt, null, 2));
+      break;
+    }
+
     case "hash": {
       const text = args.join(" ");
       if (!text) { die("Usage: varp hash <text>"); }
@@ -93,9 +111,16 @@ varp — Verifiable AI Receipt Protocol CLI
 Commands:
   varp verify <receipt.json>        Verify a single VERDICT/v1 receipt
   varp verify-ledger <ledger.jsonl> Verify all receipts in a JSONL ledger
+  varp sign --agent <name> --desc <text> --key <hex64>
+                                    Create and sign a new VERDICT/v1 receipt
   varp hash <text>                  BLAKE3(text) → hex
   varp version                      Print version and exit
   varp help                         Show this message
+
+Sign flags:
+  --key <hex64>    Ed25519 private key seed (or set VARP_PRIVATE_KEY env)
+  --sv <float>     Delta SV value (default: 0.1)
+  --prev-hash <h>  Previous receipt hash for chain linking
 
 Flags: --help / -h  Show this message
 
