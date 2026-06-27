@@ -131,6 +131,10 @@ function getVersion() {
 }
 var [, , cmd, ...args] = process.argv;
 async function main() {
+  if (cmd === "--help" || cmd === "-h" || args[0] === "--help" || args[0] === "-h") {
+    showHelp();
+    return;
+  }
   switch (cmd) {
     case "verify": {
       const path = args[0];
@@ -182,7 +186,11 @@ ${chain_valid ? "\u2713" : "\u2717"} ${passed}/${results.length} verified \u2014
       break;
     case "help":
     default:
-      console.log(`
+      showHelp();
+  }
+}
+function showHelp() {
+  console.log(`
 varp \u2014 Verifiable AI Receipt Protocol CLI
 
 Commands:
@@ -192,10 +200,11 @@ Commands:
   varp version                      Print version and exit
   varp help                         Show this message
 
+Flags: --help / -h  Show this message
+
 Verify authorship by comparing signer_pubkey against os1221.com/fate-pubkey.txt
 Learn more: https://os1221.com/verdict
 `.trim());
-  }
 }
 function die(msg) {
   console.error(msg);
