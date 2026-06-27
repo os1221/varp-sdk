@@ -169,4 +169,40 @@ describe("varp CLI", () => {
       assert.match(r.stdout, /sign.*--agent.*--desc/s);
     });
   });
+
+  describe("chain-report", () => {
+    const TEST_KEY = "0101010101010101010101010101010101010101010101010101010101010101";
+
+    it("reports 0 breaks on a perfectly linked two-entry ledger", () => {
+      const tmp = mkdtempSync(join(tmpdir(), "varp-chain-"));
+      const r1 = run(["sign", "--agent", "A", "--desc", "first", "--key", TEST_KEY]);
+      const receipt1 = JSON.parse(r1.stdout);
+      const h1 = receipt1.verdict.event_hash;
+      const r2 = run(["sign", "--agent", "A", "--desc", "second", "--key", TEST_KEY, "--prev-hash", h1]);
+      const ledger = join(tmp, "ledger.jsonl");
+      writeFileSync(ledger, [JSON.stringify(receipt1), JSON.stringify(JSON.parse(r2.stdout))].join("\n") + "\n");
+      const cr = run(["chain-report", ledger]);
+      assert.equal(cr.status, 0, `chain-report failed: ${cr.stderr}`);
+      assert.match(cr.stdout, /0 chain break/);
+      rmSync(tmp, { recursive: true });
+    });
+
+    it("detects a break when prev_hash is wrong", () => {
+      const tmp = mkdtempSync(join(tmpdir(), "varp-chain-break-"));
+      const r1 = run(["sign", "--agent", "A", "--desc", "first", "--key", TEST_KEY]);
+      const receipt1 = JSON.parse(r1.stdout);
+      const r2 = run(["sign", "--agent", "A", "--desc", "second", "--key", TEST_KEY, "--prev-hash", "deadbeef".repeat(8)]);
+      const ledger = join(tmp, "ledger.jsonl");
+      writeFileSync(ledger, [JSON.stringify(receipt1), JSON.stringify(JSON.parse(r2.stdout))].join("\n") + "\n");
+      const cr = run(["chain-report", ledger]);
+      assert.notEqual(cr.status, 0, "should detect chain break");
+      assert.match(cr.stdout, /1 chain break/);
+      rmSync(tmp, { recursive: true });
+    });
+
+    it("help shows chain-report", () => {
+      const r = run(["help"]);
+      assert.match(r.stdout, /chain-report/);
+    });
+  });
 });

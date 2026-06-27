@@ -217,6 +217,50 @@ async function main() {
 ${chain_valid ? "\u2713" : "\u2717"} ${passed}/${results.length} verified \u2014 chain_valid: ${chain_valid}`);
       process.exit(chain_valid ? 0 : 1);
     }
+    case "chain-report": {
+      const path = args[0];
+      if (!path) {
+        die("Usage: varp chain-report <ledger.jsonl>");
+      }
+      const text = (0, import_node_fs.readFileSync)(path, "utf8");
+      const lines = text.split("\n").filter((l) => l.trim());
+      let prevHash = null;
+      let breaks = 0;
+      const report = [];
+      for (let i = 0; i < lines.length; i++) {
+        let entry;
+        try {
+          entry = JSON.parse(lines[i]);
+        } catch {
+          report.push(`  line ${i + 1}: parse_error`);
+          breaks++;
+          continue;
+        }
+        const v = entry.verdict;
+        if (!v) {
+          report.push(`  line ${i + 1}: no_verdict`);
+          continue;
+        }
+        const hash = v.event_hash;
+        const prev = v.prev_hash;
+        if (i === 0) {
+          prevHash = hash ?? null;
+          report.push(`  line ${i + 1}: chain_root ${hash?.slice(0, 12) ?? "?"}\u2026`);
+          continue;
+        }
+        if (prev && prevHash && prev !== prevHash) {
+          report.push(`  line ${i + 1}: BREAK \u2014 prev_hash mismatch (expected ${prevHash.slice(0, 12)}\u2026, got ${prev.slice(0, 12)}\u2026)`);
+          breaks++;
+        }
+        prevHash = hash ?? prevHash;
+      }
+      const ok = breaks === 0;
+      report.slice(0, 20).forEach((r) => console.log(r));
+      if (report.length > 20) console.log(`  \u2026 and ${report.length - 20} more`);
+      console.log(`
+${ok ? "\u2713" : "\u2717"} ${lines.length} entries, ${breaks} chain break(s)`);
+      process.exit(ok ? 0 : 1);
+    }
     case "sign": {
       const getFlag = (f) => {
         const i = args.indexOf(f);
@@ -266,6 +310,7 @@ varp \u2014 Verifiable AI Receipt Protocol CLI
 Commands:
   varp verify <receipt.json>        Verify a single VERDICT/v1 receipt
   varp verify-ledger <ledger.jsonl> Verify all receipts in a JSONL ledger
+  varp chain-report <ledger.jsonl>  Check prev_hash chain linkage (chain integrity audit)
   varp sign --agent <name> --desc <text> --key <hex64>
                                     Create and sign a new VERDICT/v1 receipt
   varp hash <text>                  BLAKE3(text) \u2192 hex
