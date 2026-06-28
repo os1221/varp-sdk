@@ -1,47 +1,4 @@
-"use strict";
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-
 // src/index.ts
-var index_exports = {};
-__export(index_exports, {
-  blake3Hex: () => blake3Hex,
-  bytesToHex: () => bytesToHex,
-  createVerdictV1: () => createVerdictV1,
-  getPublicKey: () => getPublicKey,
-  hashContent: () => hashContent,
-  hexToBytes: () => hexToBytes,
-  jcsStringify: () => jcsStringify,
-  parseLedger: () => parseLedger,
-  verifyLedger: () => verifyLedger,
-  verifyReceipt: () => verifyReceipt
-});
-module.exports = __toCommonJS(index_exports);
 function jcsStringify(val) {
   if (val === null) return "null";
   if (typeof val === "boolean") return val ? "true" : "false";
@@ -101,15 +58,19 @@ async function verifyReceipt(line) {
   const payload = extractContentPayload(line);
   if (!payload) return { verified: false, reason: "no_content_payload" };
   const isOmegaFormat = ev != null;
-  const canonical = isOmegaFormat ? jcsStringify(payload) : jcsStringify(payload);
+  let canonical;
+  if (isOmegaFormat) {
+    let s = `{"description":${JSON.stringify(payload["description"])},"delta_sv":${payload["delta_sv"]},"timestamp":${JSON.stringify(payload["timestamp"])}`;
+    if (payload["evidence_root"] != null) s += `,"evidence_root":${JSON.stringify(payload["evidence_root"])}`;
+    s += "}";
+    canonical = s;
+  } else {
+    canonical = jcsStringify(payload);
+  }
   const recomputed = await blake3Hex(new TextEncoder().encode(canonical));
   if (recomputed !== hash.toLowerCase()) {
-    const legacyFloat = (n) => Number.isFinite(n) && Number.isInteger(n) ? n.toFixed(1) : JSON.stringify(n);
-    const dsv = payload["delta_sv"];
-    let legacyStr = `{"description":${JSON.stringify(payload["description"])},"delta_sv":${legacyFloat(dsv)},"timestamp":${JSON.stringify(payload["timestamp"])}`;
-    if (payload["evidence_root"] != null) legacyStr += `,"evidence_root":${JSON.stringify(payload["evidence_root"])}`;
-    legacyStr += "}";
-    const legacyRecomputed = await blake3Hex(new TextEncoder().encode(legacyStr));
+    const legacyCanonical = jcsStringify(payload);
+    const legacyRecomputed = await blake3Hex(new TextEncoder().encode(legacyCanonical));
     if (legacyRecomputed !== hash.toLowerCase()) {
       return { verified: false, reason: "hash_mismatch", event_hash: hash };
     }
@@ -225,16 +186,16 @@ function parseLedger(text) {
     }
   });
 }
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  blake3Hex,
-  bytesToHex,
-  createVerdictV1,
-  getPublicKey,
-  hashContent,
-  hexToBytes,
+
+export {
   jcsStringify,
-  parseLedger,
+  blake3Hex,
+  verifyReceipt,
   verifyLedger,
-  verifyReceipt
-});
+  createVerdictV1,
+  hexToBytes,
+  bytesToHex,
+  hashContent,
+  getPublicKey,
+  parseLedger
+};

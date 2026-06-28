@@ -4,7 +4,7 @@ import {
   hashContent,
   verifyLedger,
   verifyReceipt
-} from "./chunk-2B3GHOHW.mjs";
+} from "./chunk-5VZTEHYT.mjs";
 
 // src/cli.ts
 import { readFileSync } from "fs";

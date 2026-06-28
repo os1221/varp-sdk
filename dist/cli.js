@@ -58,27 +58,48 @@ async function blake3Hex(data) {
 function extractContentPayload(line) {
   const v = line.verdict;
   if (!v) return null;
-  return {
-    agent: v.agent,
-    description: v.description,
-    timestamp: v.timestamp,
-    delta_sv: v.delta_sv,
-    ...v.evidence_root ? { evidence_root: v.evidence_root } : {}
+  if (v["event"] && typeof v["event"] === "object") {
+    const ev = v["event"];
+    const payload2 = {
+      description: ev["description"],
+      delta_sv: ev["delta_sv"],
+      timestamp: ev["timestamp"]
+    };
+    if (ev["evidence_root"] != null) payload2["evidence_root"] = ev["evidence_root"];
+    return payload2;
+  }
+  const payload = {
+    agent: v["agent"],
+    description: v["description"],
+    timestamp: v["timestamp"],
+    delta_sv: v["delta_sv"]
   };
+  if (v["evidence_root"] != null) payload["evidence_root"] = v["evidence_root"];
+  return payload;
 }
 async function verifyReceipt(line) {
   const v = line.verdict;
   if (!v) return { verified: false, reason: "no_verdict_field" };
-  const sig = v.signature;
-  const pub = v.signer_pubkey;
-  const hash = v.event_hash;
+  const sig = v["signature"] ?? v["signature_hex"];
+  const pub = v["signer_pubkey"] ?? v["signer_pubkey_hex"];
+  const ev = v["event"];
+  const hash = v["event_hash"] ?? (ev && ev["hash"]);
   if (!sig || !pub || !hash) return { verified: false, reason: "missing_fields" };
   const payload = extractContentPayload(line);
   if (!payload) return { verified: false, reason: "no_content_payload" };
-  const canonical = jcsStringify(payload);
+  const isOmegaFormat = ev != null;
+  const canonical = isOmegaFormat ? jcsStringify(payload) : jcsStringify(payload);
   const recomputed = await blake3Hex(new TextEncoder().encode(canonical));
   if (recomputed !== hash.toLowerCase()) {
-    return { verified: false, reason: "hash_mismatch", event_hash: hash };
+    const legacyFloat = (n) => Number.isFinite(n) && Number.isInteger(n) ? n.toFixed(1) : JSON.stringify(n);
+    const dsv = payload["delta_sv"];
+    let legacyStr = `{"description":${JSON.stringify(payload["description"])},"delta_sv":${legacyFloat(dsv)},"timestamp":${JSON.stringify(payload["timestamp"])}`;
+    if (payload["evidence_root"] != null) legacyStr += `,"evidence_root":${JSON.stringify(payload["evidence_root"])}`;
+    legacyStr += "}";
+    const legacyRecomputed = await blake3Hex(new TextEncoder().encode(legacyStr));
+    if (legacyRecomputed !== hash.toLowerCase()) {
+      return { verified: false, reason: "hash_mismatch", event_hash: hash };
+    }
   }
   try {
     const { verifyAsync } = await import("@noble/ed25519");

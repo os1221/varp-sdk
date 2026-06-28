@@ -36,12 +36,29 @@ export interface VerdictV1Envelope {
   evidence_root?: string;
 }
 
+// Live omega-receipts format (verdict.event.hash / verdict.signature_hex / verdict.signer_pubkey_hex)
+export interface OmegaReceiptEvent {
+  timestamp?: string;
+  description?: string;
+  delta_sv?: number;
+  hash?: string;
+  [key: string]: unknown;
+}
+
+export interface OmegaReceiptVerdict {
+  event?: OmegaReceiptEvent;
+  signature_hex?: string;
+  signer_pubkey_hex?: string;
+  [key: string]: unknown;
+}
+
 export interface LedgerLine {
-  verdict?: VerdictV1Envelope;
+  verdict?: VerdictV1Envelope | OmegaReceiptVerdict;
   // Direct fields (some older entries are flat)
   event_hash?: string;
   signature?: string;
   signer_pubkey?: string;
+  prev_hash?: string;
   [key: string]: unknown;
 }
 
@@ -82,16 +99,33 @@ async function blake3Hex(data: Uint8Array): Promise<string> {
 // ── Content payload extraction ───────────────────────────────────────────────
 
 function extractContentPayload(line: LedgerLine): Record<string, unknown> | null {
-  const v = line.verdict;
+  const v = line.verdict as Record<string, unknown> | undefined;
   if (!v) return null;
-  // Canonical content-binding payload: fields inside verdict.event + outer envelope fields
-  return {
-    agent: v.agent,
-    description: v.description,
-    timestamp: v.timestamp,
-    delta_sv: v.delta_sv,
-    ...(v.evidence_root ? { evidence_root: v.evidence_root } : {}),
+
+  // Live omega-receipts format: verdict.event contains the event fields
+  // Rust EventPayload: { description, delta_sv, timestamp, evidence_root? }
+  // (agent is NOT included in the content hash for omega-receipts)
+  if (v["event"] && typeof v["event"] === "object") {
+    const ev = v["event"] as Record<string, unknown>;
+    const payload: Record<string, unknown> = {
+      description: ev["description"],
+      delta_sv: ev["delta_sv"],
+      timestamp: ev["timestamp"],
+    };
+    if (ev["evidence_root"] != null) payload["evidence_root"] = ev["evidence_root"];
+    return payload;
+  }
+
+  // VERDICT/v1 envelope format: fields are directly on verdict
+  // (council sessions, attest module)
+  const payload: Record<string, unknown> = {
+    agent: v["agent"],
+    description: v["description"],
+    timestamp: v["timestamp"],
+    delta_sv: v["delta_sv"],
   };
+  if (v["evidence_root"] != null) payload["evidence_root"] = v["evidence_root"];
+  return payload;
 }
 
 // ── Core verify ──────────────────────────────────────────────────────────────
@@ -106,21 +140,43 @@ function extractContentPayload(line: LedgerLine): Record<string, unknown> | null
  * Returns a VerifyResult with { verified: true } if both checks pass.
  */
 export async function verifyReceipt(line: LedgerLine): Promise<VerifyResult> {
-  const v = line.verdict;
+  const v = line.verdict as Record<string, unknown> | undefined;
   if (!v) return { verified: false, reason: "no_verdict_field" };
 
-  const sig = v.signature;
-  const pub = v.signer_pubkey;
-  const hash = v.event_hash;
+  // Support both VERDICT/v1 envelope format AND live omega-receipts format
+  const sig = (v["signature"] ?? v["signature_hex"]) as string | undefined;
+  const pub = (v["signer_pubkey"] ?? v["signer_pubkey_hex"]) as string | undefined;
+  // Hash: VERDICT/v1 has event_hash; omega-receipts has verdict.event.hash
+  const ev = v["event"] as Record<string, unknown> | undefined;
+  const hash = (v["event_hash"] ?? (ev && ev["hash"])) as string | undefined;
   if (!sig || !pub || !hash) return { verified: false, reason: "missing_fields" };
 
   // Step 1: Recompute content hash
   const payload = extractContentPayload(line);
   if (!payload) return { verified: false, reason: "no_content_payload" };
-  const canonical = jcsStringify(payload);
+
+  // omega-receipts ledger has two canonical formats (see receipt_ledger.rs):
+  // 1. JCS (post-2026-06-10 cutover): serde_jcs → keys sorted alphabetically.
+  //    EventPayload: {delta_sv, description, timestamp[, evidence_root]}
+  // 2. Legacy (pre-cutover, 1469 records): serde_json → struct declaration order.
+  //    EventPayload: {description, delta_sv, timestamp[, evidence_root]}
+  //    ALSO: serde_json serializes integer-valued f64 as "0.0"; JCS normalizes to "0".
+  const isOmegaFormat = ev != null;
+  const canonical = isOmegaFormat ? jcsStringify(payload) : jcsStringify(payload);
+
   const recomputed = await blake3Hex(new TextEncoder().encode(canonical));
   if (recomputed !== hash.toLowerCase()) {
-    return { verified: false, reason: "hash_mismatch", event_hash: hash };
+    // Try legacy serde_json format: struct declaration order + "0.0" for integer floats.
+    const legacyFloat = (n: number): string =>
+      Number.isFinite(n) && Number.isInteger(n) ? n.toFixed(1) : JSON.stringify(n);
+    const dsv = payload["delta_sv"] as number;
+    let legacyStr = `{"description":${JSON.stringify(payload["description"])},"delta_sv":${legacyFloat(dsv)},"timestamp":${JSON.stringify(payload["timestamp"])}`;
+    if (payload["evidence_root"] != null) legacyStr += `,"evidence_root":${JSON.stringify(payload["evidence_root"])}`;
+    legacyStr += "}";
+    const legacyRecomputed = await blake3Hex(new TextEncoder().encode(legacyStr));
+    if (legacyRecomputed !== hash.toLowerCase()) {
+      return { verified: false, reason: "hash_mismatch", event_hash: hash };
+    }
   }
 
   // Step 2: Verify Ed25519 signature over the hash
