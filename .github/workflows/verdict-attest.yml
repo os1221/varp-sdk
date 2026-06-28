@@ -1,0 +1,87 @@
+name: Verdict Attest
+'on':
+  push:
+    branches:
+    - main
+    - master
+    tags:
+    - v*
+  pull_request:
+    branches:
+    - main
+    - master
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Install verdict-cli[v1]
+      run: pip install -e "file://${{ github.workspace} github.workspace }}/../verdict-cli[v1]" 2>/dev/null || pip install
+        "verdict[v1] @ git+https://github.com/os1221/verdict-cli.git"
+    - name: Gather build facts
+      id: facts
+      run: 'python3 -c "
+
+        from verdict import attest
+
+        import json
+
+        facts = attest.gather_build_facts(''.'')
+
+        print(''facts<<EOF'')
+
+        print(json.dumps(facts))
+
+        print(''EOF'')
+
+        " >> $GITHUB_OUTPUT'
+    - name: Sign build attestation
+      id: sign
+      env:
+        VERDICT_BUILDER: github-actions
+        VERDICT_KEY_PATH: ${{secrets.VERDICT_SIGNING_KEY}}
+      run: 'python3 -c "
+
+        from verdict import attest
+
+        import json, os
+
+        key_path = os.getenv(''VERDICT_KEY_PATH'') or None
+
+        envelope = attest.sign_build(''.'', builder=''github-actions'', key_path=key_path)
+
+        print(''envelope<<EOF'')
+
+        print(json.dumps(envelope))
+
+        print(''EOF'')
+
+        " >> $GITHUB_OUTPUT'
+    - name: Verify attestation matches checkout
+      run: "python3 -c \"\nfrom verdict import attest\nimport json, os, sys\nenvelope = json.loads('''${{steps.sign.outputs.envelope}}''')\n\
+        result = attest.verify_build(envelope, '.')\nprint('Verification:', json.dumps(result))\nif not result.get('signature_valid'):\n\
+        \    print('ERROR: Signature verification failed')\n    sys.exit(1)\nif not result.get('matches_checkout'):\n    print('ERROR:\
+        \ Attestation does not match checkout')\n    sys.exit(1)\nprint('Attestation valid and matches checkout')\n\""
+    - name: Create attestation file
+      run: echo '${{steps.sign.outputs.envelope}}' > verdict-build-attestation.json
+    - name: Upload attestation artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: verdict-build-attestation
+        path: verdict-build-attestation.json
+        retention-days: 90
+    - name: Fail on dirty working tree (for tagged releases)
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: "python3 -c \"\nimport json, sys\nenvelope = json.loads('''${{steps.sign.outputs.envelope}}''')\nif envelope['receipt'].get('dirty'):\n\
+        \    print('ERROR: Tagged release built from dirty working tree')\n    sys.exit(1)\nprint('Clean working tree for\
+        \ release')\n\""
