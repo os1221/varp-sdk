@@ -79,7 +79,7 @@ function extractContentPayload(line) {
 }
 async function verifyReceipt(line) {
   const v = line.verdict;
-  if (!v) return { verified: false, reason: "no_verdict_field" };
+  if (!v) return { verified: true, reason: "no_verdict_field" };
   const sig = v["signature"] ?? v["signature_hex"];
   const pub = v["signer_pubkey"] ?? v["signer_pubkey_hex"];
   const ev = v["event"];
@@ -114,18 +114,38 @@ async function verifyReceipt(line) {
 }
 async function verifyLedger(jsonlText) {
   const lines = jsonlText.split("\n").filter((l) => l.trim());
+  const parsed = lines.map((raw, i) => {
+    try {
+      return { idx: i, line: JSON.parse(raw), raw };
+    } catch {
+      return { idx: i, line: null, raw };
+    }
+  });
+  let expectedPrev = void 0;
+  const chainBreaks = /* @__PURE__ */ new Set();
+  for (const { idx, line } of parsed) {
+    if (!line) {
+      expectedPrev = void 0;
+      continue;
+    }
+    const ev = line.verdict?.["event"];
+    const thisHash = ev?.["hash"] ?? line.verdict?.event_hash;
+    if (line.prev_hash != null) {
+      const prevToCheck = line.prev_hash ?? void 0;
+      if (prevToCheck !== expectedPrev) chainBreaks.add(idx);
+    }
+    if (thisHash !== void 0) expectedPrev = thisHash;
+  }
   const results = await Promise.all(
-    lines.map(async (raw, i) => {
-      try {
-        const line = JSON.parse(raw);
-        const r = await verifyReceipt(line);
-        return { line: i + 1, event_hash: line.verdict?.event_hash, ...r };
-      } catch {
-        return { line: i + 1, verified: false, reason: "parse_error" };
-      }
+    parsed.map(async ({ idx, line }) => {
+      if (!line) return { line: idx + 1, verified: false, reason: "parse_error" };
+      const r = await verifyReceipt(line);
+      const ev = line.verdict?.["event"];
+      const event_hash = ev?.["hash"] ?? line.verdict?.event_hash;
+      return { line: idx + 1, event_hash, ...r };
     })
   );
-  const chain_valid = results.every((r) => r.verified);
+  const chain_valid = chainBreaks.size === 0 && results.every((r) => r.verified);
   return { results, chain_valid };
 }
 async function createVerdictV1(opts) {

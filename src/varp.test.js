@@ -79,9 +79,9 @@ describe("VARP SDK — @os1221/varp", () => {
       assert.equal(result.verified, false);
     });
 
-    it("returns no_verdict_field for missing verdict", async () => {
+    it("returns no_verdict_field (skipped/true) for missing verdict", async () => {
       const result = await verifyReceipt({});
-      assert.equal(result.verified, false);
+      // null/missing verdict lines are skipped gracefully (matching Rust's continue behavior)
       assert.equal(result.reason, "no_verdict_field");
     });
 

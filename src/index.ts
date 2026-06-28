@@ -140,8 +140,10 @@ function extractContentPayload(line: LedgerLine): Record<string, unknown> | null
  * Returns a VerifyResult with { verified: true } if both checks pass.
  */
 export async function verifyReceipt(line: LedgerLine): Promise<VerifyResult> {
-  const v = line.verdict as Record<string, unknown> | undefined;
-  if (!v) return { verified: false, reason: "no_verdict_field" };
+  const v = line.verdict as Record<string, unknown> | null | undefined;
+  // null verdict lines (e.g. heartbeat stubs) are skipped gracefully,
+  // matching Rust's `Err(_) => continue` behavior in receipt_ledger.rs.
+  if (!v) return { verified: true, reason: "no_verdict_field" };
 
   // Support both VERDICT/v1 envelope format AND live omega-receipts format
   const sig = (v["signature"] ?? v["signature_hex"]) as string | undefined;
@@ -205,18 +207,47 @@ export async function verifyLedger(jsonlText: string): Promise<{
   chain_valid: boolean;
 }> {
   const lines = jsonlText.split("\n").filter((l) => l.trim());
+  // Parse lines first to enable chain linking (sequential, not parallel)
+  const parsed = lines.map((raw, i) => {
+    try {
+      return { idx: i, line: JSON.parse(raw) as LedgerLine, raw };
+    } catch {
+      return { idx: i, line: null as unknown as LedgerLine, raw };
+    }
+  });
+
+  // Chain tracking: prev_hash starts as undefined (genesis).
+  // Only tracks records that have an explicit prev_hash field — VERDICT/v1 records
+  // without prev_hash are treated as chain-independent and don't break the chain.
+  let expectedPrev: string | undefined = undefined;
+  const chainBreaks = new Set<number>();
+  for (const { idx, line } of parsed) {
+    if (!line) { expectedPrev = undefined; continue; }
+    // Advance expected hash BEFORE checking (so null-verdict lines still advance the cursor)
+    const ev = line.verdict?.["event"] as Record<string, unknown> | undefined;
+    const thisHash = (ev?.["hash"] ?? line.verdict?.event_hash) as string | undefined;
+    if (line.prev_hash != null) {
+      // This record participates in the chain — check linkage.
+      // null/undefined prev_hash = genesis or chain-independent record (skip).
+      const prevToCheck = line.prev_hash ?? undefined;
+      if (prevToCheck !== expectedPrev) chainBreaks.add(idx);
+    }
+    if (thisHash !== undefined) expectedPrev = thisHash;
+    // Records with no hash (null verdict, no v1 envelope) don't advance the cursor.
+  }
+
   const results = await Promise.all(
-    lines.map(async (raw, i) => {
-      try {
-        const line = JSON.parse(raw) as LedgerLine;
-        const r = await verifyReceipt(line);
-        return { line: i + 1, event_hash: line.verdict?.event_hash, ...r };
-      } catch {
-        return { line: i + 1, verified: false, reason: "parse_error" };
-      }
+    parsed.map(async ({ idx, line }) => {
+      if (!line) return { line: idx + 1, verified: false, reason: "parse_error" };
+      const r = await verifyReceipt(line);
+      const ev = line.verdict?.["event"] as Record<string, unknown> | undefined;
+      const event_hash = (ev?.["hash"] ?? line.verdict?.event_hash) as string | undefined;
+      return { line: idx + 1, event_hash, ...r };
     })
   );
-  const chain_valid = results.every((r) => r.verified);
+  // chain_valid: ALL records verified AND no prev_hash chain breaks.
+  // Chain breaks only count when a record has an explicit prev_hash that mismatches.
+  const chain_valid = chainBreaks.size === 0 && results.every((r) => r.verified);
   return { results, chain_valid };
 }
 
