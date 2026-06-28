@@ -223,17 +223,15 @@ export async function verifyLedger(jsonlText: string): Promise<{
   const chainBreaks = new Set<number>();
   for (const { idx, line } of parsed) {
     if (!line) { expectedPrev = undefined; continue; }
-    // Advance expected hash BEFORE checking (so null-verdict lines still advance the cursor)
+    // Skip null-verdict lines — Rust audit uses continue on parse error for these.
+    if (line.verdict == null) continue;
     const ev = line.verdict?.["event"] as Record<string, unknown> | undefined;
     const thisHash = (ev?.["hash"] ?? line.verdict?.event_hash) as string | undefined;
     if (line.prev_hash != null) {
-      // This record participates in the chain — check linkage.
-      // null/undefined prev_hash = genesis or chain-independent record (skip).
       const prevToCheck = line.prev_hash ?? undefined;
       if (prevToCheck !== expectedPrev) chainBreaks.add(idx);
     }
     if (thisHash !== undefined) expectedPrev = thisHash;
-    // Records with no hash (null verdict, no v1 envelope) don't advance the cursor.
   }
 
   const results = await Promise.all(

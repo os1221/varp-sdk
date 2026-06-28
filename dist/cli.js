@@ -128,6 +128,7 @@ async function verifyLedger(jsonlText) {
       expectedPrev = void 0;
       continue;
     }
+    if (line.verdict == null) continue;
     const ev = line.verdict?.["event"];
     const thisHash = ev?.["hash"] ?? line.verdict?.event_hash;
     if (line.prev_hash != null) {
