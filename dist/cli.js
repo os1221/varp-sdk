@@ -192,6 +192,10 @@ async function createVerdictV1(opts) {
       delta_sv: opts.delta_sv ?? 0.1,
       description: opts.description,
       agent: opts.agent,
+      // evidence_root is part of the SIGNED payload, so it MUST be carried into the
+      // envelope — otherwise the verifier can't reconstruct the hash and verification
+      // fails for every content-bound receipt. (Regression: see round-trip test.)
+      ...opts.evidence_root ? { evidence_root: opts.evidence_root } : {},
       chain_valid: true,
       content_valid: true
     }
