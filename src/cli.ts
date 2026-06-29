@@ -5,6 +5,8 @@
  * Commands:
  *   varp verify <receipt.json>        Verify a single receipt file
  *   varp verify-ledger <ledger.jsonl> Verify all receipts in a JSONL ledger
+ *   varp verify-warrant-packet <proof-packet.json> <report.json>
+ *                                      Verify a public Meridian/Warrant proof packet
  *   varp hash <text>                  BLAKE3-hash a string, output hex
  *   varp version                      Print version and exit
  *   varp help                         Show usage
@@ -13,7 +15,13 @@
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { verifyReceipt, verifyLedger, hashContent, createVerdictV1 } from "./index.js";
+import {
+  verifyReceipt,
+  verifyLedger,
+  verifyWarrantProofPacket,
+  hashContent,
+  createVerdictV1,
+} from "./index.js";
 
 function getVersion(): string {
   try {
@@ -64,6 +72,19 @@ async function main() {
       });
       console.log(`\n${chain_valid ? "✓" : "✗"} ${passed}/${results.length} verified — chain_valid: ${chain_valid}`);
       process.exit(chain_valid ? 0 : 1);
+    }
+
+    case "verify-warrant-packet": {
+      const packetPath = args[0];
+      const reportPath = args[1];
+      if (!packetPath || !reportPath) {
+        die("Usage: varp verify-warrant-packet <proof-packet.json> <report.json>");
+      }
+      const packet = JSON.parse(readFileSync(packetPath, "utf8"));
+      const reportRaw = readFileSync(reportPath, "utf8");
+      const result = await verifyWarrantProofPacket(packet, reportRaw);
+      console.log(JSON.stringify(result, null, 2));
+      process.exit(result.verified ? 0 : 1);
     }
 
     case "chain-report": {
@@ -225,6 +246,8 @@ varp — Verifiable AI Receipt Protocol CLI
 Commands:
   varp verify <receipt.json>        Verify a single VERDICT/v1 receipt
   varp verify-ledger <ledger.jsonl> Verify all receipts in a JSONL ledger
+  varp verify-warrant-packet <proof-packet.json> <report.json>
+                                    Verify public Meridian/Warrant packet + report fixtures
   varp chain-report <ledger.jsonl>  Check prev_hash chain linkage (chain integrity audit)
   varp summarize <ledger.jsonl>     Show receipt count, agents, date range, top agents
   varp sign --agent <name> --desc <text> --key <hex64>

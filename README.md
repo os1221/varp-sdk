@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/@os1221/varp)](https://www.npmjs.com/package/@os1221/varp)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![tests](https://img.shields.io/badge/tests-28%20passing-brightgreen)](src/varp.test.js)
+[![tests](https://img.shields.io/badge/tests-58%20passing-brightgreen)](src/varp.test.js)
 [![cli](https://img.shields.io/badge/cli-varp-blue)]()
 
 **Verifiable AI Receipt Protocol** — cryptographic provenance for every AI agent action.
@@ -36,6 +36,9 @@ npx @os1221/varp verify receipt.json
 
 # Verify all receipts in a JSONL ledger
 npx @os1221/varp verify-ledger receipts.jsonl
+
+# Verify a public Meridian/Warrant proof packet against its report fixture
+npx @os1221/varp verify-warrant-packet proof-packet.fixture.json report.fixture.json
 
 # Hash any string with BLAKE3
 npx @os1221/varp hash "receipts not vibes"
@@ -77,6 +80,9 @@ Verify a single VERDICT/v1 receipt. Checks BLAKE3 content hash and Ed25519 signa
 ### `verifyLedger(jsonlText: string): Promise<{ results: VerifyResult[], chain_valid: boolean }>`
 Verify all receipts in a JSONL ledger string. Checks each line and validates `prev_hash` chain linkage.
 
+### `verifyWarrantProofPacket(packet, reportTextOrObject): Promise<WarrantPacketVerifyResult>`
+Verify public Meridian/Warrant proof-packet metadata against the exact public report fixture. It checks the report SHA-256 hash, coverage hash, repo/preflight counts, receipt event hash, and the public redaction state for the private Omega ledger.
+
 ### `createVerdictV1(opts: SignOptions): Promise<LedgerLine>`
 Sign a new VERDICT/v1 receipt with an Ed25519 private key. Computes BLAKE3(JCS(body)) as `event_hash`.
 
@@ -112,6 +118,28 @@ const hex = await hashContent("receipts not vibes");
 ```
 
 Each `prev_hash` must equal the `event_hash` of the preceding receipt. A broken chain is detectable offline — no server required.
+
+## Verify a Meridian/Warrant proof packet
+
+Public Warrant proof packets are designed for offline buyer verification without exposing a private Omega receipt ledger:
+
+```bash
+npx @os1221/varp verify-warrant-packet \
+  proof-packet.fixture.json \
+  report.fixture.json
+```
+
+Expected success shape:
+
+```json
+{
+  "verified": true,
+  "status": "unavailable_private_ledger",
+  "private_ledger_status": "redacted"
+}
+```
+
+`verified: true` means the public packet matches the public report fixture and its receipt metadata is internally consistent. `status: "unavailable_private_ledger"` is intentional: private Omega ledger continuity is redacted from public fixtures, so this command does not claim private chain/signature verification.
 
 ## Security properties
 

@@ -7,9 +7,11 @@ import {
   hexToBytes,
   jcsStringify,
   parseLedger,
+  sha256Hex,
   verifyLedger,
-  verifyReceipt
-} from "./chunk-HVIW3FWV.mjs";
+  verifyReceipt,
+  verifyWarrantProofPacket
+} from "./chunk-7HVVZOV2.mjs";
 export {
   blake3Hex,
   bytesToHex,
@@ -19,6 +21,8 @@ export {
   hexToBytes,
   jcsStringify,
   parseLedger,
+  sha256Hex,
   verifyLedger,
-  verifyReceipt
+  verifyReceipt,
+  verifyWarrantProofPacket
 };

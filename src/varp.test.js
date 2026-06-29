@@ -1,6 +1,10 @@
 // @ts-check
 import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { sha512 } from "@noble/hashes/sha512";
 import * as ed25519 from "@noble/ed25519";
 
@@ -8,7 +12,18 @@ import * as ed25519 from "@noble/ed25519";
 ed25519.etc.sha512Sync = (...msgs) => sha512(...msgs);
 
 // Dynamic import since the SDK ships ESM
-const { verifyReceipt, verifyLedger, createVerdictV1, hexToBytes, bytesToHex, hashContent, getPublicKey, parseLedger } = await import("../dist/index.mjs");
+const sdk = await import("../dist/index.mjs");
+const {
+  verifyReceipt,
+  verifyLedger,
+  verifyWarrantProofPacket,
+  createVerdictV1,
+  hexToBytes,
+  bytesToHex,
+  hashContent,
+  getPublicKey,
+  parseLedger,
+} = sdk;
 
 // Test keypair (ephemeral — for tests only)
 const TEST_PRIV = "0101010101010101010101010101010101010101010101010101010101010101";
@@ -219,6 +234,150 @@ describe("VARP SDK — @os1221/varp", () => {
       const jsonl = JSON.stringify(sampleReceipt) + "\n";
       const entries = parseLedger(jsonl);
       assert.equal(entries.length, 1);
+    });
+  });
+
+  describe("public SDK surface", () => {
+    it("does not expose stylometric attribution before the safe-to-claim contract lands", async () => {
+      assert.equal("attributeLLM" in sdk, false);
+    });
+  });
+
+  describe("verifyWarrantProofPacket", () => {
+    const warrantReport = {
+      generated_at: "2026-06-28T19:54:50+00:00",
+      coverage_hash: "coverage-123",
+      receipt: {
+        ok: true,
+        coverage_hash: "coverage-123",
+        event_hash: "event-123",
+        ledger: "redacted:omega-ledger",
+        signer_pubkey: "pubkey-123",
+        timestamp: "2026-06-28T19:54:50.843250+00:00",
+      },
+      repos: [
+        {
+          repo: "a",
+          policy_generated: true,
+          checks: {
+            builtin_destructive_block: { decision: "block" },
+            read_only_allows: { decision: "allow" },
+            credential_requires_approval: { decision: "require_approval" },
+          },
+        },
+        {
+          repo: "b",
+          policy_generated: true,
+          checks: {
+            builtin_destructive_block: { decision: "block" },
+            read_only_allows: { decision: "allow" },
+            credential_requires_approval: { decision: "block" },
+          },
+        },
+      ],
+      summary: { failures: [] },
+    };
+
+    async function packetFor(report) {
+      const reportRaw = JSON.stringify(report, null, 2);
+      const reportHash = "sha256:" + await hashContentSha256(reportRaw);
+      return {
+        packet: {
+          schema: "meridian-warrant-proof-packet/0.1",
+          status: "pass",
+          generatedAt: report.generated_at,
+          report: {
+            evidencePath: "/proof/warrant-coverage/report.fixture.json",
+            evidenceHash: reportHash,
+            coverageHash: report.coverage_hash,
+            repoCount: report.repos.length,
+            policyGenerated: report.repos.filter((repo) => repo.policy_generated).length,
+            policyMissing: 0,
+            failures: 0,
+          },
+          preflight: {
+            destructiveBlocks: 2,
+            readOnlyAllows: 2,
+            credentialGates: 2,
+          },
+          receipt: {
+            status: "signed",
+            eventHash: report.receipt.event_hash,
+            coverageHash: report.receipt.coverage_hash,
+            verification: {
+              status: "unavailable",
+              ledgerMatched: false,
+              signatureVerified: false,
+              chainLinked: false,
+              reason: "private Omega ledger redacted from public fixture",
+            },
+          },
+        },
+        reportRaw,
+      };
+    }
+
+    async function hashContentSha256(text) {
+      const { createHash } = await import("node:crypto");
+      return createHash("sha256").update(text, "utf8").digest("hex");
+    }
+
+    it("verifies public packet/report consistency while marking private ledger redacted", async () => {
+      const { packet, reportRaw } = await packetFor(warrantReport);
+      const result = await verifyWarrantProofPacket(packet, reportRaw);
+      assert.equal(result.verified, true);
+      assert.equal(result.status, "unavailable_private_ledger");
+      assert.equal(result.private_ledger_status, "redacted");
+      assert.equal(result.repo_count, 2);
+      assert.equal(result.credential_gates, 2);
+      assert.equal(result.receipt_event_hash, "event-123");
+      assert.deepEqual(result.reasons, ["public_packet_verified_private_ledger_redacted"]);
+    });
+
+    it("rejects a tampered report hash", async () => {
+      const { packet } = await packetFor(warrantReport);
+      const tamperedRaw = JSON.stringify({ ...warrantReport, coverage_hash: "coverage-tampered" }, null, 2);
+      const result = await verifyWarrantProofPacket(packet, tamperedRaw);
+      assert.equal(result.verified, false);
+      assert.equal(result.status, "invalid");
+      assert.ok(result.reasons.includes("report_hash_mismatch"));
+      assert.ok(result.reasons.includes("coverage_hash_mismatch"));
+    });
+
+    it("rejects mismatched receipt coverage hash", async () => {
+      const { packet, reportRaw } = await packetFor(warrantReport);
+      packet.receipt.coverageHash = "wrong";
+      const result = await verifyWarrantProofPacket(packet, reportRaw);
+      assert.equal(result.verified, false);
+      assert.ok(result.reasons.includes("receipt_coverage_hash_mismatch"));
+    });
+
+    it("rejects missing private-ledger redaction status", async () => {
+      const { packet, reportRaw } = await packetFor(warrantReport);
+      packet.receipt.verification.status = "verified";
+      delete packet.receipt.verification.reason;
+      const result = await verifyWarrantProofPacket(packet, reportRaw);
+      assert.equal(result.verified, false);
+      assert.ok(result.reasons.includes("private_ledger_status_not_redacted"));
+    });
+
+    it("CLI verifies packet and report fixtures as JSON", async () => {
+      const { packet, reportRaw } = await packetFor(warrantReport);
+      const dir = mkdtempSync(join(tmpdir(), "varp-warrant-"));
+      const packetPath = join(dir, "proof-packet.fixture.json");
+      const reportPath = join(dir, "report.fixture.json");
+      writeFileSync(packetPath, JSON.stringify(packet, null, 2));
+      writeFileSync(reportPath, reportRaw);
+      const proc = spawnSync(
+        process.execPath,
+        ["dist/cli.js", "verify-warrant-packet", packetPath, reportPath],
+        { cwd: process.cwd(), encoding: "utf8" },
+      );
+      assert.equal(proc.status, 0, proc.stderr || proc.stdout);
+      const parsed = JSON.parse(proc.stdout);
+      assert.equal(parsed.verified, true);
+      assert.equal(parsed.status, "unavailable_private_ledger");
+      assert.equal(parsed.private_ledger_status, "redacted");
     });
   });
 });

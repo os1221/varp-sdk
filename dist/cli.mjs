@@ -3,8 +3,9 @@ import {
   createVerdictV1,
   hashContent,
   verifyLedger,
-  verifyReceipt
-} from "./chunk-HVIW3FWV.mjs";
+  verifyReceipt,
+  verifyWarrantProofPacket
+} from "./chunk-7HVVZOV2.mjs";
 
 // src/cli.ts
 import { readFileSync } from "fs";
@@ -58,6 +59,18 @@ async function main() {
       console.log(`
 ${chain_valid ? "\u2713" : "\u2717"} ${passed}/${results.length} verified \u2014 chain_valid: ${chain_valid}`);
       process.exit(chain_valid ? 0 : 1);
+    }
+    case "verify-warrant-packet": {
+      const packetPath = args[0];
+      const reportPath = args[1];
+      if (!packetPath || !reportPath) {
+        die("Usage: varp verify-warrant-packet <proof-packet.json> <report.json>");
+      }
+      const packet = JSON.parse(readFileSync(packetPath, "utf8"));
+      const reportRaw = readFileSync(reportPath, "utf8");
+      const result = await verifyWarrantProofPacket(packet, reportRaw);
+      console.log(JSON.stringify(result, null, 2));
+      process.exit(result.verified ? 0 : 1);
     }
     case "chain-report": {
       const path = args[0];
@@ -243,6 +256,8 @@ varp \u2014 Verifiable AI Receipt Protocol CLI
 Commands:
   varp verify <receipt.json>        Verify a single VERDICT/v1 receipt
   varp verify-ledger <ledger.jsonl> Verify all receipts in a JSONL ledger
+  varp verify-warrant-packet <proof-packet.json> <report.json>
+                                    Verify public Meridian/Warrant packet + report fixtures
   varp chain-report <ledger.jsonl>  Check prev_hash chain linkage (chain integrity audit)
   varp summarize <ledger.jsonl>     Show receipt count, agents, date range, top agents
   varp sign --agent <name> --desc <text> --key <hex64>

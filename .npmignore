@@ -1,0 +1,4 @@
+*.bak-*
+**/*.bak-*
+.codex-backups/
+node_modules/

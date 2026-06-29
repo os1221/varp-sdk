@@ -22,6 +22,23 @@ export type VerifyResult = {
   signer_pubkey?: string;
 };
 
+export type WarrantPacketStatus =
+  | "verified"
+  | "invalid"
+  | "unavailable_private_ledger";
+
+export interface WarrantPacketVerifyResult {
+  verified: boolean;
+  status: WarrantPacketStatus;
+  reasons: string[];
+  report_hash?: string;
+  coverage_hash?: string;
+  repo_count?: number;
+  credential_gates?: number;
+  receipt_event_hash?: string;
+  private_ledger_status: "redacted" | "not_checked";
+}
+
 export interface VerdictV1Envelope {
   event_hash: string;
   signature: string;
@@ -94,6 +111,11 @@ async function blake3Hex(data: Uint8Array): Promise<string> {
     const hash = await crypto.subtle.digest("SHA-256", data);
     return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
   }
+}
+
+async function sha256Hex(data: Uint8Array): Promise<string> {
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // ── Content payload extraction ───────────────────────────────────────────────
@@ -335,7 +357,132 @@ export async function hashContent(text: string): Promise<string> {
   return blake3Hex(new TextEncoder().encode(text));
 }
 
-export { jcsStringify, blake3Hex };
+export { jcsStringify, blake3Hex, sha256Hex };
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function numberValue(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function warrantCredentialGateCount(report: Record<string, unknown>): number {
+  const repos = Array.isArray(report["repos"]) ? report["repos"] : [];
+  let count = 0;
+  for (const rawRepo of repos) {
+    const repo = asRecord(rawRepo);
+    const checks = asRecord(repo["checks"]);
+    const credential = asRecord(checks["credential_requires_approval"]);
+    const decision = credential["decision"];
+    if (decision === "require_approval" || decision === "block") count++;
+  }
+  return count;
+}
+
+function warrantDecisionCount(report: Record<string, unknown>, checkName: string, expected: string): number {
+  const repos = Array.isArray(report["repos"]) ? report["repos"] : [];
+  let count = 0;
+  for (const rawRepo of repos) {
+    const repo = asRecord(rawRepo);
+    const checks = asRecord(repo["checks"]);
+    const check = asRecord(checks[checkName]);
+    if (check["decision"] === expected) count++;
+  }
+  return count;
+}
+
+/**
+ * Verify a public Meridian/Warrant proof packet against its public report fixture.
+ *
+ * This intentionally verifies only public facts: exact report hash, packet/report
+ * summary consistency, and receipt metadata consistency. Private Omega ledger
+ * continuity is expected to be redacted in public fixtures, so a clean public
+ * packet returns status `unavailable_private_ledger` with `verified: true`.
+ */
+export async function verifyWarrantProofPacket(
+  packetInput: unknown,
+  reportInput: unknown
+): Promise<WarrantPacketVerifyResult> {
+  const reasons: string[] = [];
+  const packet = asRecord(packetInput);
+  const reportRaw = typeof reportInput === "string" ? reportInput : JSON.stringify(reportInput, null, 2);
+  let report: Record<string, unknown>;
+  try {
+    report = asRecord(typeof reportInput === "string" ? JSON.parse(reportInput) : reportInput);
+  } catch {
+    return {
+      verified: false,
+      status: "invalid",
+      reasons: ["report_parse_error"],
+      private_ledger_status: "not_checked",
+    };
+  }
+
+  if (packet["schema"] !== "meridian-warrant-proof-packet/0.1") {
+    reasons.push("packet_schema_mismatch");
+  }
+  if (packet["status"] !== "pass") reasons.push("packet_status_not_pass");
+
+  const reportSection = asRecord(packet["report"]);
+  const preflight = asRecord(packet["preflight"]);
+  const receipt = asRecord(packet["receipt"]);
+  const receiptVerification = asRecord(receipt["verification"]);
+  const reportHash = "sha256:" + await sha256Hex(new TextEncoder().encode(reportRaw));
+  if (reportSection["evidenceHash"] !== reportHash) reasons.push("report_hash_mismatch");
+
+  const repos = Array.isArray(report["repos"]) ? report["repos"] : [];
+  const repoCount = repos.length;
+  const policyGenerated = repos.filter((repo) => asRecord(repo)["policy_generated"] === true).length;
+  const summary = asRecord(report["summary"]);
+  const failures = Array.isArray(summary["failures"]) ? summary["failures"].length : 0;
+  const coverageHash = stringValue(report["coverage_hash"]);
+  const destructiveBlocks = warrantDecisionCount(report, "builtin_destructive_block", "block");
+  const readOnlyAllows = warrantDecisionCount(report, "read_only_allows", "allow");
+  const credentialGates = warrantCredentialGateCount(report);
+
+  if (numberValue(reportSection["repoCount"]) !== repoCount) reasons.push("repo_count_mismatch");
+  if (numberValue(reportSection["policyGenerated"]) !== policyGenerated) reasons.push("policy_generated_mismatch");
+  if (numberValue(reportSection["failures"]) !== failures) reasons.push("failure_count_mismatch");
+  if (reportSection["coverageHash"] !== coverageHash) reasons.push("coverage_hash_mismatch");
+  if (numberValue(preflight["destructiveBlocks"]) !== destructiveBlocks) reasons.push("destructive_blocks_mismatch");
+  if (numberValue(preflight["readOnlyAllows"]) !== readOnlyAllows) reasons.push("read_only_allows_mismatch");
+  if (numberValue(preflight["credentialGates"]) !== credentialGates) reasons.push("credential_gates_mismatch");
+
+  const reportReceipt = asRecord(report["receipt"]);
+  const receiptEventHash = stringValue(reportReceipt["event_hash"]);
+  const receiptCoverageHash = stringValue(reportReceipt["coverage_hash"]);
+  if (receipt["status"] !== "signed") reasons.push("receipt_not_signed");
+  if (receipt["eventHash"] !== receiptEventHash) reasons.push("receipt_event_hash_mismatch");
+  if (receipt["coverageHash"] !== receiptCoverageHash || receipt["coverageHash"] !== coverageHash) {
+    reasons.push("receipt_coverage_hash_mismatch");
+  }
+
+  const privateLedgerRedacted =
+    receiptVerification["status"] === "unavailable" &&
+    receiptVerification["reason"] === "private Omega ledger redacted from public fixture";
+  const privateLedgerStatus = privateLedgerRedacted ? "redacted" : "not_checked";
+  if (!privateLedgerRedacted) reasons.push("private_ledger_status_not_redacted");
+
+  const verified = reasons.length === 0;
+  return {
+    verified,
+    status: verified ? "unavailable_private_ledger" : "invalid",
+    reasons: verified ? ["public_packet_verified_private_ledger_redacted"] : reasons,
+    report_hash: reportHash,
+    coverage_hash: coverageHash,
+    repo_count: repoCount,
+    credential_gates: credentialGates,
+    receipt_event_hash: receiptEventHash,
+    private_ledger_status: privateLedgerStatus,
+  };
+}
 
 /**
  * Derive the Ed25519 public key from a private key seed hex string.
