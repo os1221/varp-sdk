@@ -35,14 +35,18 @@ describe("VERDICT/v1 conformance vectors (canonical golden set)", () => {
         assert.equal(await blake3Hex(utf8(jcsStringify(v.receipt))), v.expected_content_hash);
       });
 
-      it(`${v.name}: Ed25519 signature verifies over content-hash utf8 bytes`, () => {
-        const ok = ed25519.verify(
-          Uint8Array.from(Buffer.from(v.signature, "hex")),
-          utf8(v.expected_content_hash),
-          Uint8Array.from(Buffer.from(v.signer_pubkey, "hex")),
-        );
-        assert.equal(ok, true);
-      });
+      // adv_* canonicalization vectors are unsigned: they pin expected_jcs +
+      // expected_content_hash only. Signature rows apply to signed vectors.
+      if (v.signature) {
+        it(`${v.name}: Ed25519 signature verifies over content-hash utf8 bytes`, () => {
+          const ok = ed25519.verify(
+            Uint8Array.from(Buffer.from(v.signature, "hex")),
+            utf8(v.expected_content_hash),
+            Uint8Array.from(Buffer.from(v.signer_pubkey, "hex")),
+          );
+          assert.equal(ok, true);
+        });
+      }
     }
 
     if (v.reused_content_hash_from) {
