@@ -46,14 +46,16 @@ function jcsStringify(val) {
   throw new Error(`JCS: unsupported type ${typeof val}`);
 }
 async function blake3Hex(data) {
+  let blake3;
   try {
-    const { blake3 } = await import("@noble/hashes/blake3");
-    const hash = blake3(data);
-    return Array.from(hash).map((b) => b.toString(16).padStart(2, "0")).join("");
-  } catch {
-    const hash = await crypto.subtle.digest("SHA-256", data);
-    return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    ({ blake3 } = await import("@noble/hashes/blake3"));
+  } catch (e) {
+    throw new Error(
+      "@noble/hashes/blake3 unavailable \u2014 cannot compute VERDICT/v1 content hash (refusing SHA-256 substitution): " + (e instanceof Error ? e.message : String(e))
+    );
   }
+  const hash = blake3(data);
+  return Array.from(hash).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 async function sha256Hex(data) {
   const hash = await crypto.subtle.digest("SHA-256", data);

@@ -102,15 +102,20 @@ function jcsStringify(val: unknown): string {
 // ── BLAKE3 hashing ───────────────────────────────────────────────────────────
 
 async function blake3Hex(data: Uint8Array): Promise<string> {
+  // No fallback hash: VERDICT/v1 content hashes are BLAKE3 by spec. A silent
+  // SHA-256 substitute produces hashes that look valid but can never match a
+  // conforming implementation — fail loudly instead.
+  let blake3: (data: Uint8Array) => Uint8Array;
   try {
-    const { blake3 } = await import("@noble/hashes/blake3");
-    const hash = blake3(data);
-    return Array.from(hash).map((b) => b.toString(16).padStart(2, "0")).join("");
-  } catch {
-    // Fallback to SHA-256 if blake3 unavailable (Node < 20 edge case)
-    const hash = await crypto.subtle.digest("SHA-256", data);
-    return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    ({ blake3 } = await import("@noble/hashes/blake3"));
+  } catch (e) {
+    throw new Error(
+      "@noble/hashes/blake3 unavailable — cannot compute VERDICT/v1 content hash (refusing SHA-256 substitution): " +
+        (e instanceof Error ? e.message : String(e)),
+    );
   }
+  const hash = blake3(data);
+  return Array.from(hash).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 async function sha256Hex(data: Uint8Array): Promise<string> {
