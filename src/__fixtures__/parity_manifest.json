@@ -1,0 +1,9 @@
+{
+ "schema": "mesh.parity-manifest/v1",
+ "_comment": "Vendored from parity/manifest.json \u2014 pins the sha256 of this repo's canonical-vector copies so drift fails THIS repo's CI. Update only as part of a cross-repo vector sweep (see parity/README.md).",
+ "source": "parity/manifest.json",
+ "files": {
+  "src/__fixtures__/conformance_vectors.json": "c93fd394f042f586bc2e94662bdaf8fb68fe80651c88703ec2e397481ed9e557",
+  "src/__fixtures__/proof_packet_vectors.json": "e50d197e26a39b507e419c687a6f44c2b0130994b9595ffbbee0cefc85e125b4"
+ }
+}

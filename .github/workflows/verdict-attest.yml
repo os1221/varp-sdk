@@ -26,8 +26,10 @@ jobs:
       with:
         python-version: '3.12'
     - name: Install verdict-cli[v1]
-      run: pip install -e "file://${{ github.workspace} github.workspace }}/../verdict-cli[v1]" 2>/dev/null || pip install
-        "verdict[v1] @ git+https://github.com/os1221/verdict-cli.git"
+      # Mirrors verdict-cli dacedbf: the old file:// template was malformed
+      # (double-escaped `${{ github.workspace}` expression) and the 2>/dev/null
+      # fallback masked it. Install straight from the repo instead.
+      run: pip install "verdict-cli[v1] @ git+https://github.com/os1221/verdict-cli.git"
     - name: Gather build facts
       id: facts
       run: 'python3 -c "
