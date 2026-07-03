@@ -1,0 +1,20 @@
+name: CI
+# Enforce the SDK's own test suite (71 tests incl. the canonical VERDICT/v1
+# conformance vectors) on push/PR. pretest builds dist via tsup.
+'on':
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test
