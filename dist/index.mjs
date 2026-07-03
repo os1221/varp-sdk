@@ -3,6 +3,7 @@ import {
   blake3Hex,
   bytesToHex,
   createVerdictV1,
+  ed25519Verify,
   getPublicKey,
   hashContent,
   hexToBytes,
@@ -14,12 +15,13 @@ import {
   verifyProofPacket,
   verifyReceipt,
   verifyWarrantProofPacket
-} from "./chunk-VSKAGMSO.mjs";
+} from "./chunk-HLPTEGFZ.mjs";
 export {
   PROOF_PACKET_SCHEMA,
   blake3Hex,
   bytesToHex,
   createVerdictV1,
+  ed25519Verify,
   getPublicKey,
   hashContent,
   hexToBytes,

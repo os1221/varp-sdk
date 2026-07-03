@@ -16,7 +16,8 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts src/cli.ts --format cjs,esm && node scripts/gen-dts.js",
+    "build": "tsup src/index.ts src/cli.ts --format cjs,esm && node scripts/gen-dts.js && npm run build:browser",
+    "build:browser": "esbuild src/index.ts --bundle --format=esm --platform=browser --external:node:crypto --outfile=dist/varp.browser.mjs && esbuild src/index.ts --bundle --format=iife --global-name=VARP --platform=browser --external:node:crypto --outfile=dist/varp.browser.js",
     "pretest": "npm run build",
     "test": "node --test src/*.test.js",
     "prepublishOnly": "npm run build"

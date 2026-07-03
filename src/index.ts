@@ -366,6 +366,24 @@ export async function hashContent(text: string): Promise<string> {
   return blake3Hex(new TextEncoder().encode(text));
 }
 
+/**
+ * Verify a raw Ed25519 signature over arbitrary message bytes (or a UTF-8 string).
+ * Low-level primitive used by browser verifiers built on this SDK's bundle.
+ */
+export async function ed25519Verify(
+  signatureHex: string,
+  message: Uint8Array | string,
+  publicKeyHex: string,
+): Promise<boolean> {
+  const { verifyAsync } = await import("@noble/ed25519");
+  const msgBytes = typeof message === "string" ? new TextEncoder().encode(message) : message;
+  try {
+    return await verifyAsync(hexToBytes(signatureHex), msgBytes, hexToBytes(publicKeyHex));
+  } catch {
+    return false;
+  }
+}
+
 export { jcsStringify, blake3Hex, sha256Hex };
 
 function asRecord(value: unknown): Record<string, unknown> {
