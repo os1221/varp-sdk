@@ -493,6 +493,301 @@ export async function verifyWarrantProofPacket(
   };
 }
 
+// ── verdict.proof-packet/v1 (verdict-cli parity) ─────────────────────────────
+// The monetized proof-packet wrapper produced by verdict-cli's
+// `verdict.proof_packet` module. This is a DIFFERENT contract from the
+// Meridian warrant packet above ("meridian-warrant-proof-packet/0.1").
+// Validation rules and error strings mirror verdict-cli's
+// `validate_proof_packet` one-for-one; the golden vectors in
+// src/__fixtures__/proof_packet_vectors.json (vendored byte-identically from
+// verdict-cli/tests/) prove that a packet produced by the Python CLI verifies
+// here with the same canonical bytes, hash, and signature.
+
+export const PROOF_PACKET_SCHEMA = "verdict.proof-packet/v1";
+
+export interface ProofPacketValidation {
+  valid: boolean;
+  errors: string[];
+}
+
+export interface ProofPacketVerifyResult {
+  kind: "proof_packet" | "verdict_v1_envelope";
+  valid: boolean;
+  /** null for raw packets (nothing to verify); boolean for envelopes. */
+  signature_valid: boolean | null;
+  validation: ProofPacketValidation;
+  errors: string[];
+  subject?: string;
+  action?: string;
+  unit_id?: string;
+  content_hash?: string;
+  signer_pubkey?: string;
+}
+
+const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+// Mirrors verdict-cli's Decimal-based `_decimal`: unparseable/absent → skip.
+function decimalValue(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (typeof value !== "number" && typeof value !== "string") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+async function validateProofPacketClaim(
+  claim: Record<string, unknown>,
+  errors: string[],
+): Promise<void> {
+  const statement = claim["statement"];
+  const statementSha256 = claim["statement_sha256"];
+  if (!statement && !statementSha256) {
+    errors.push("claim must include statement or statement_sha256");
+    return;
+  }
+  if (statement !== undefined && statement !== null && typeof statement !== "string") {
+    errors.push("claim.statement must be a string");
+    return;
+  }
+  if (
+    statementSha256 !== undefined &&
+    statementSha256 !== null &&
+    (typeof statementSha256 !== "string" || !SHA256_HEX_RE.test(statementSha256))
+  ) {
+    errors.push("claim.statement_sha256 must be 64 lowercase hex chars");
+    return;
+  }
+  if (statement && statementSha256) {
+    // The public statement must bind to the hash it presents.
+    const recomputed = await sha256Hex(new TextEncoder().encode(statement as string));
+    if (recomputed !== statementSha256) {
+      errors.push("claim.statement_sha256 does not match claim.statement");
+    }
+  }
+}
+
+/**
+ * Structural validation of a `verdict.proof-packet/v1` object.
+ * Same rules and error strings as verdict-cli's `validate_proof_packet`.
+ */
+export async function validateProofPacket(packetInput: unknown): Promise<ProofPacketValidation> {
+  if (!isPlainObject(packetInput)) {
+    return { valid: false, errors: ["packet must be an object"] };
+  }
+  const packet = packetInput;
+  const errors: string[] = [];
+
+  if (packet["schema"] !== PROOF_PACKET_SCHEMA) {
+    errors.push(`schema must be ${PROOF_PACKET_SCHEMA}`);
+  }
+
+  for (const field of ["issued_at", "producer", "subject", "action"]) {
+    if (!nonEmptyString(packet[field])) errors.push(`${field} must be a non-empty string`);
+  }
+
+  const unit = packet["unit"];
+  if (!isPlainObject(unit)) {
+    errors.push("unit must be an object");
+  } else {
+    for (const field of ["id", "unit", "currency"]) {
+      if (!nonEmptyString(unit[field])) errors.push(`unit.${field} must be a non-empty string`);
+    }
+    const amount = decimalValue(unit["amount_usd"]);
+    const maxAmount = decimalValue(unit["max_amount_usd"]);
+    if (amount !== undefined && amount < 0) errors.push("unit.amount_usd must be non-negative");
+    if (maxAmount !== undefined && maxAmount < 0) {
+      errors.push("unit.max_amount_usd must be non-negative");
+    }
+    if (amount !== undefined && maxAmount !== undefined && amount > maxAmount) {
+      errors.push("unit.amount_usd must not exceed unit.max_amount_usd");
+    }
+  }
+
+  const claim = packet["claim"];
+  if (!isPlainObject(claim)) {
+    errors.push("claim must be an object");
+  } else {
+    await validateProofPacketClaim(claim, errors);
+  }
+
+  const evidence = packet["evidence"];
+  if (!Array.isArray(evidence)) {
+    errors.push("evidence must be a list");
+  } else {
+    evidence.forEach((item, index) => {
+      if (!isPlainObject(item)) {
+        errors.push(`evidence[${index}] must be an object`);
+        return;
+      }
+      if (!nonEmptyString(item["type"])) {
+        errors.push(`evidence[${index}].type must be a non-empty string`);
+      }
+      const hasRef = ["uri", "content_sha256", "content_hash", "chain_hash"].some((f) =>
+        Boolean(item[f]),
+      );
+      if (!hasRef) {
+        errors.push(
+          `evidence[${index}] must include uri, content_sha256, content_hash, or chain_hash`,
+        );
+      }
+    });
+  }
+
+  const receipts = packet["receipts"];
+  if (!Array.isArray(receipts)) {
+    errors.push("receipts must be a list");
+  } else {
+    receipts.forEach((item, index) => {
+      if (!isPlainObject(item)) {
+        errors.push(`receipts[${index}] must be an object`);
+        return;
+      }
+      if (!nonEmptyString(item["protocol"])) {
+        errors.push(`receipts[${index}].protocol must be a non-empty string`);
+      }
+      const hasRef = [
+        "content_hash",
+        "chain_hash",
+        "receipt_sha256",
+        "envelope_sha256",
+        "signature",
+      ].some((f) => Boolean(item[f]));
+      if (!hasRef) {
+        errors.push(
+          `receipts[${index}] must include content_hash, chain_hash, receipt_sha256, envelope_sha256, or signature`,
+        );
+      }
+    });
+  }
+
+  const payment = packet["payment"];
+  if (payment !== undefined && payment !== null) {
+    if (!isPlainObject(payment)) {
+      errors.push("payment must be an object when present");
+    } else if (isPlainObject(unit)) {
+      const amount = decimalValue(payment["amount_usd"]);
+      const maxAmount = decimalValue(unit["max_amount_usd"]);
+      if (amount !== undefined && amount < 0) {
+        errors.push("payment.amount_usd must be non-negative");
+      }
+      if (amount !== undefined && maxAmount !== undefined && amount > maxAmount) {
+        errors.push("payment.amount_usd must not exceed unit.max_amount_usd");
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+function extractProofPacketArtifact(
+  payload: unknown,
+): ["proof_packet" | "verdict_v1_envelope", unknown] {
+  const p = asRecord(payload);
+  if (isPlainObject(p["packet"])) return ["proof_packet", p["packet"]];
+  if (isPlainObject(p["envelope"])) return ["verdict_v1_envelope", p["envelope"]];
+  if (p["schema"] === PROOF_PACKET_SCHEMA) return ["proof_packet", payload];
+  if (p["protocol"] === "VERDICT/v1") return ["verdict_v1_envelope", payload];
+  throw new Error(
+    "input must be a proof packet, a VERDICT/v1 envelope, or include packet/envelope",
+  );
+}
+
+function proofPacketUnitId(packet: Record<string, unknown>): string | undefined {
+  const unit = packet["unit"];
+  return isPlainObject(unit) ? stringValue(unit["id"]) : undefined;
+}
+
+// VERDICT/v1 envelope signature check, mirroring verdict-cli's `v1.verify`:
+// content_hash = BLAKE3(JCS(receipt)) must recompute, and the Ed25519
+// signature covers the UTF-8 bytes of the content-hash hex string.
+async function verifyV1EnvelopeSignature(envelope: Record<string, unknown>): Promise<boolean> {
+  const receipt = envelope["receipt"];
+  const claimed = envelope["content_hash"];
+  const sig = envelope["signature"];
+  const pub = envelope["signer_pubkey"];
+  if (
+    !isPlainObject(receipt) ||
+    typeof claimed !== "string" ||
+    typeof sig !== "string" ||
+    typeof pub !== "string"
+  ) {
+    return false;
+  }
+  try {
+    const recomputed = await blake3Hex(new TextEncoder().encode(jcsStringify(receipt)));
+    if (recomputed !== claimed) return false;
+    const { verifyAsync } = await import("@noble/ed25519");
+    return await verifyAsync(
+      hexToBytes(sig),
+      new TextEncoder().encode(claimed),
+      hexToBytes(pub),
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Verify a `verdict.proof-packet/v1` artifact produced by verdict-cli.
+ *
+ * Accepts a raw packet, `{ packet }`, a signed VERDICT/v1 envelope whose
+ * `receipt` is a proof packet, or `{ envelope }` — the same shapes as
+ * verdict-cli's paid `POST /api/verify` origin. Raw packets get structural
+ * validation only (`signature_valid: null`); envelopes additionally verify
+ * BLAKE3(JCS(receipt)) and the Ed25519 signature over the hash hex.
+ * Never signs or mutates the artifact.
+ */
+export async function verifyProofPacket(input: unknown): Promise<ProofPacketVerifyResult> {
+  const [kind, artifact] = extractProofPacketArtifact(input);
+
+  if (kind === "proof_packet") {
+    const validation = await validateProofPacket(artifact);
+    const packet = asRecord(artifact);
+    return {
+      kind,
+      valid: validation.valid,
+      signature_valid: null,
+      validation,
+      errors: [...validation.errors],
+      subject: stringValue(packet["subject"]),
+      action: stringValue(packet["action"]),
+      unit_id: proofPacketUnitId(packet),
+    };
+  }
+
+  const envelope = asRecord(artifact);
+  const receipt = envelope["receipt"];
+  const validation = await validateProofPacket(receipt);
+  const errors = [...validation.errors];
+  if (envelope["protocol"] !== "VERDICT/v1") {
+    errors.push("envelope.protocol must be VERDICT/v1");
+  }
+  const signatureValid = await verifyV1EnvelopeSignature(envelope);
+  if (!signatureValid) errors.push("signature_invalid");
+
+  const packet = asRecord(receipt);
+  return {
+    kind,
+    // Derived from the full error list so it can never disagree with errors.
+    valid: errors.length === 0,
+    signature_valid: signatureValid,
+    validation,
+    errors,
+    subject: stringValue(packet["subject"]),
+    action: stringValue(packet["action"]),
+    unit_id: proofPacketUnitId(packet),
+    content_hash: stringValue(envelope["content_hash"]),
+    signer_pubkey: stringValue(envelope["signer_pubkey"]),
+  };
+}
+
 /**
  * Derive the Ed25519 public key from a private key seed hex string.
  * Useful for displaying the public key that corresponds to your signing key

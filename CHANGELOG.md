@@ -2,6 +2,25 @@
 
 All notable changes to `@os1221/varp` are documented here.
 
+## [Unreleased]
+
+### Added
+- `verifyProofPacket(input)` / `validateProofPacket(packet)` / `PROOF_PACKET_SCHEMA` —
+  cross-language verifier for `verdict.proof-packet/v1`, the monetized proof-packet
+  wrapper produced by verdict-cli's `verdict.proof_packet` module (a DIFFERENT contract
+  from `verifyWarrantProofPacket`'s `meridian-warrant-proof-packet/0.1`). Accepts a raw
+  packet, `{ packet }`, a signed VERDICT/v1 envelope, or `{ envelope }`; validation rules
+  and error strings mirror the Python `validate_proof_packet` one-for-one, including the
+  `statement` ↔ `statement_sha256` binding check. Envelopes verify
+  `BLAKE3(JCS(receipt))` and the Ed25519 signature over the content-hash hex.
+- Golden proof-packet conformance vectors vendored byte-identically from
+  `verdict-cli/tests/proof_packet_vectors.json` into
+  `src/__fixtures__/proof_packet_vectors.json` (3 packets incl. adversarial
+  non-ASCII/astral-key/ES-number canonicalization; signed with the PUBLIC RFC 8032 §7.1
+  TEST 1 key), consumed by `src/proof-packet.test.js` — the executable proof that a
+  packet produced by verdict-cli Python verifies in this SDK.
+- Suite: 114 tests (was 89).
+
 ## [1.0.0] — 2026-06-27
 
 ### Added

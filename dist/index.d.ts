@@ -62,6 +62,29 @@ export declare function verifyWarrantProofPacket(
   packetInput: unknown,
   reportInput: unknown
 ): Promise<WarrantPacketVerifyResult>;
+
+export declare const PROOF_PACKET_SCHEMA: "verdict.proof-packet/v1";
+
+export interface ProofPacketValidation {
+  valid: boolean;
+  errors: string[];
+}
+
+export interface ProofPacketVerifyResult {
+  kind: "proof_packet" | "verdict_v1_envelope";
+  valid: boolean;
+  signature_valid: boolean | null;
+  validation: ProofPacketValidation;
+  errors: string[];
+  subject?: string;
+  action?: string;
+  unit_id?: string;
+  content_hash?: string;
+  signer_pubkey?: string;
+}
+
+export declare function validateProofPacket(packetInput: unknown): Promise<ProofPacketValidation>;
+export declare function verifyProofPacket(input: unknown): Promise<ProofPacketVerifyResult>;
 export declare function createVerdictV1(opts: SignOptions): Promise<LedgerLine>;
 export declare function hexToBytes(hex: string): Uint8Array;
 export declare function bytesToHex(bytes: Uint8Array): string;

@@ -1,4 +1,5 @@
 import {
+  PROOF_PACKET_SCHEMA,
   blake3Hex,
   bytesToHex,
   createVerdictV1,
@@ -8,11 +9,14 @@ import {
   jcsStringify,
   parseLedger,
   sha256Hex,
+  validateProofPacket,
   verifyLedger,
+  verifyProofPacket,
   verifyReceipt,
   verifyWarrantProofPacket
-} from "./chunk-NYFNMNNC.mjs";
+} from "./chunk-VSKAGMSO.mjs";
 export {
+  PROOF_PACKET_SCHEMA,
   blake3Hex,
   bytesToHex,
   createVerdictV1,
@@ -22,7 +26,9 @@ export {
   jcsStringify,
   parseLedger,
   sha256Hex,
+  validateProofPacket,
   verifyLedger,
+  verifyProofPacket,
   verifyReceipt,
   verifyWarrantProofPacket
 };

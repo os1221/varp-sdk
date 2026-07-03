@@ -1,0 +1,302 @@
+{
+  "_comment": "verdict.proof-packet/v1 conformance vectors. Any language port MUST reproduce expected_content_hash byte-identically by: (1) JCS-canonicalizing `packet` per RFC 8785, (2) BLAKE3-256 of the canonical UTF-8 bytes, (3) lowercase hex. The signature is Ed25519 over the UTF-8 bytes of the content-hash hex string (same rule as VERDICT/v1). Canonical copy lives in verdict-cli/tests/; varp-sdk/src/__fixtures__/ vendors it byte-identically. Regenerate with tests/gen_proof_packet_vectors.py.",
+  "schema": "verdict.proof-packet/v1",
+  "canonicalization": "RFC 8785 (JCS)",
+  "hash": "blake3-256 of canonical UTF-8 bytes, lowercase hex (64 chars)",
+  "signature": "ed25519 over the UTF-8 bytes of the content-hash hex string, lowercase hex (128 chars)",
+  "fixed_test_key": {
+    "warning": "PUBLIC RFC 8032 §7.1 TEST 1 key — conformance tests only, NEVER production",
+    "ed25519_seed_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+    "ed25519_pubkey_hex": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+  },
+  "vectors": [
+    {
+      "name": "paid_forecast_ascii",
+      "comment": "Well-formed paid forecast packet: unit + claim + evidence + receipt ref + payment + boundaries. ASCII only.",
+      "packet": {
+        "schema": "verdict.proof-packet/v1",
+        "issued_at": "2026-07-01T00:00:00Z",
+        "producer": "verdict-cli",
+        "subject": "fate-sovereign-sports",
+        "action": "forecast",
+        "unit": {
+          "id": "fate-sovereign-sports.api.fate.forecast",
+          "route": "/api/fate/forecast",
+          "method": "GET",
+          "unit": "signed forecast response",
+          "currency": "USD",
+          "amount_usd": "0.05",
+          "max_amount_usd": "0.05"
+        },
+        "claim": {
+          "statement": "Team A win probability is 54 percent.",
+          "statement_sha256": "d17c887edf27afa9ecb3c5f3bbd5400b466b3e94810bd061b5a5d0b14fc87d11"
+        },
+        "evidence": [
+          {
+            "type": "market-snapshot",
+            "uri": "https://example.test/markets/123"
+          },
+          {
+            "type": "model-output",
+            "content_sha256": "50c9c8df17f529dc9f19953dcd9c19842239ea213cde21abe19acd9d41fb1d73"
+          }
+        ],
+        "receipts": [
+          {
+            "protocol": "VERDICT/v1",
+            "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "signer_pubkey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ],
+        "boundaries": [
+          "not betting advice",
+          "not financial advice"
+        ],
+        "context": {},
+        "payment": {
+          "gateway": "cloudflare-x402",
+          "amount_usd": "0.05"
+        }
+      },
+      "expected_jcs": "{\"action\":\"forecast\",\"boundaries\":[\"not betting advice\",\"not financial advice\"],\"claim\":{\"statement\":\"Team A win probability is 54 percent.\",\"statement_sha256\":\"d17c887edf27afa9ecb3c5f3bbd5400b466b3e94810bd061b5a5d0b14fc87d11\"},\"context\":{},\"evidence\":[{\"type\":\"market-snapshot\",\"uri\":\"https://example.test/markets/123\"},{\"content_sha256\":\"50c9c8df17f529dc9f19953dcd9c19842239ea213cde21abe19acd9d41fb1d73\",\"type\":\"model-output\"}],\"issued_at\":\"2026-07-01T00:00:00Z\",\"payment\":{\"amount_usd\":\"0.05\",\"gateway\":\"cloudflare-x402\"},\"producer\":\"verdict-cli\",\"receipts\":[{\"content_hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"protocol\":\"VERDICT/v1\",\"signer_pubkey\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}],\"schema\":\"verdict.proof-packet/v1\",\"subject\":\"fate-sovereign-sports\",\"unit\":{\"amount_usd\":\"0.05\",\"currency\":\"USD\",\"id\":\"fate-sovereign-sports.api.fate.forecast\",\"max_amount_usd\":\"0.05\",\"method\":\"GET\",\"route\":\"/api/fate/forecast\",\"unit\":\"signed forecast response\"}}",
+      "expected_content_hash": "9293ad209bb4948451a57713207e6293d8115216615992212aa30bc1b6b2ba68",
+      "signature": "c7ccf4f825d9b2706c200737f959e427f553ef5f91e1f3dce8eee5125da225fde72f88a6cbb3975da6e373d99f88cbba96376d430923ead89c45a23214716d0f",
+      "signer_pubkey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+      "envelope": {
+        "protocol": "VERDICT/v1",
+        "receipt": {
+          "schema": "verdict.proof-packet/v1",
+          "issued_at": "2026-07-01T00:00:00Z",
+          "producer": "verdict-cli",
+          "subject": "fate-sovereign-sports",
+          "action": "forecast",
+          "unit": {
+            "id": "fate-sovereign-sports.api.fate.forecast",
+            "route": "/api/fate/forecast",
+            "method": "GET",
+            "unit": "signed forecast response",
+            "currency": "USD",
+            "amount_usd": "0.05",
+            "max_amount_usd": "0.05"
+          },
+          "claim": {
+            "statement": "Team A win probability is 54 percent.",
+            "statement_sha256": "d17c887edf27afa9ecb3c5f3bbd5400b466b3e94810bd061b5a5d0b14fc87d11"
+          },
+          "evidence": [
+            {
+              "type": "market-snapshot",
+              "uri": "https://example.test/markets/123"
+            },
+            {
+              "type": "model-output",
+              "content_sha256": "50c9c8df17f529dc9f19953dcd9c19842239ea213cde21abe19acd9d41fb1d73"
+            }
+          ],
+          "receipts": [
+            {
+              "protocol": "VERDICT/v1",
+              "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "signer_pubkey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "boundaries": [
+            "not betting advice",
+            "not financial advice"
+          ],
+          "context": {},
+          "payment": {
+            "gateway": "cloudflare-x402",
+            "amount_usd": "0.05"
+          }
+        },
+        "content_hash": "9293ad209bb4948451a57713207e6293d8115216615992212aa30bc1b6b2ba68",
+        "signature": "c7ccf4f825d9b2706c200737f959e427f553ef5f91e1f3dce8eee5125da225fde72f88a6cbb3975da6e373d99f88cbba96376d430923ead89c45a23214716d0f",
+        "signer_pubkey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+      }
+    },
+    {
+      "name": "paid_brief_non_ascii",
+      "comment": "Adversarial canonicalization: non-ASCII/NFC text, non-BMP emoji, astral-vs-fullwidth key sort (UTF-16 code-unit order), and ES number formatting (1.0→1, 1e-7, -0.0→0).",
+      "packet": {
+        "schema": "verdict.proof-packet/v1",
+        "issued_at": "2026-07-01T00:00:00Z",
+        "producer": "verdict-cli",
+        "subject": "last30days",
+        "action": "brief",
+        "unit": {
+          "id": "last30days.api.brief",
+          "route": "/api/brief",
+          "method": "POST",
+          "unit": "hosted brief run — café tier",
+          "currency": "USD",
+          "amount_usd": "0.10",
+          "max_amount_usd": "1.00"
+        },
+        "claim": {
+          "statement": "Le café de naïveté à Tōkyō (東京) coûte 0,10 € — résumé signé 🎯.",
+          "statement_sha256": "96b365cfbc21eb4ec74f6a192ddbe5a5ad98b35137ccdbae88bff923d5da13f9"
+        },
+        "evidence": [
+          {
+            "type": "source-list",
+            "content_sha256": "f005c67d394006cd6686f1e560f23226dab833c54637dc10146ba7b07f70551b"
+          }
+        ],
+        "receipts": [],
+        "boundaries": [
+          "ne constitue pas un conseil financier"
+        ],
+        "context": {
+          "😀": "astral key (U+1F600) sorts by UTF-16 code units: D83D DE00",
+          "ｚ": "fullwidth z (U+FF5A) sorts AFTER the astral key in UTF-16",
+          "confidence": 0.54,
+          "weights": [
+            1.0,
+            1e-07,
+            -0.0
+          ]
+        }
+      },
+      "expected_jcs": "{\"action\":\"brief\",\"boundaries\":[\"ne constitue pas un conseil financier\"],\"claim\":{\"statement\":\"Le café de naïveté à Tōkyō (東京) coûte 0,10 € — résumé signé 🎯.\",\"statement_sha256\":\"96b365cfbc21eb4ec74f6a192ddbe5a5ad98b35137ccdbae88bff923d5da13f9\"},\"context\":{\"confidence\":0.54,\"weights\":[1,1e-7,0],\"😀\":\"astral key (U+1F600) sorts by UTF-16 code units: D83D DE00\",\"ｚ\":\"fullwidth z (U+FF5A) sorts AFTER the astral key in UTF-16\"},\"evidence\":[{\"content_sha256\":\"f005c67d394006cd6686f1e560f23226dab833c54637dc10146ba7b07f70551b\",\"type\":\"source-list\"}],\"issued_at\":\"2026-07-01T00:00:00Z\",\"producer\":\"verdict-cli\",\"receipts\":[],\"schema\":\"verdict.proof-packet/v1\",\"subject\":\"last30days\",\"unit\":{\"amount_usd\":\"0.10\",\"currency\":\"USD\",\"id\":\"last30days.api.brief\",\"max_amount_usd\":\"1.00\",\"method\":\"POST\",\"route\":\"/api/brief\",\"unit\":\"hosted brief run — café tier\"}}",
+      "expected_content_hash": "4e1262caf6a87760daff072ebab1981304bcb10b1807c68eac5869e034d04a5e",
+      "signature": "2cf447b8149d06c3763c2d07c97c8fb0cf16e53e883c21d28d30cae5c69759351f69a0855f9a1646629503c60d62f7feb32cb459a2b6343e52ffb0b52d224208",
+      "signer_pubkey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+      "envelope": {
+        "protocol": "VERDICT/v1",
+        "receipt": {
+          "schema": "verdict.proof-packet/v1",
+          "issued_at": "2026-07-01T00:00:00Z",
+          "producer": "verdict-cli",
+          "subject": "last30days",
+          "action": "brief",
+          "unit": {
+            "id": "last30days.api.brief",
+            "route": "/api/brief",
+            "method": "POST",
+            "unit": "hosted brief run — café tier",
+            "currency": "USD",
+            "amount_usd": "0.10",
+            "max_amount_usd": "1.00"
+          },
+          "claim": {
+            "statement": "Le café de naïveté à Tōkyō (東京) coûte 0,10 € — résumé signé 🎯.",
+            "statement_sha256": "96b365cfbc21eb4ec74f6a192ddbe5a5ad98b35137ccdbae88bff923d5da13f9"
+          },
+          "evidence": [
+            {
+              "type": "source-list",
+              "content_sha256": "f005c67d394006cd6686f1e560f23226dab833c54637dc10146ba7b07f70551b"
+            }
+          ],
+          "receipts": [],
+          "boundaries": [
+            "ne constitue pas un conseil financier"
+          ],
+          "context": {
+            "😀": "astral key (U+1F600) sorts by UTF-16 code units: D83D DE00",
+            "ｚ": "fullwidth z (U+FF5A) sorts AFTER the astral key in UTF-16",
+            "confidence": 0.54,
+            "weights": [
+              1.0,
+              1e-07,
+              -0.0
+            ]
+          }
+        },
+        "content_hash": "4e1262caf6a87760daff072ebab1981304bcb10b1807c68eac5869e034d04a5e",
+        "signature": "2cf447b8149d06c3763c2d07c97c8fb0cf16e53e883c21d28d30cae5c69759351f69a0855f9a1646629503c60d62f7feb32cb459a2b6343e52ffb0b52d224208",
+        "signer_pubkey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+      }
+    },
+    {
+      "name": "private_claim_hash_only",
+      "comment": "Privacy-preserving packet: claim carried as statement_sha256 only; council sha256-chain receipt reference.",
+      "packet": {
+        "schema": "verdict.proof-packet/v1",
+        "issued_at": "2026-07-01T00:00:00Z",
+        "producer": "verdict-cli",
+        "subject": "meridian",
+        "action": "proof-bundle",
+        "unit": {
+          "id": "meridian.api.proof-bundle",
+          "route": "/api/proof-bundle",
+          "method": "POST",
+          "unit": "signed guard-check bundle",
+          "currency": "USD",
+          "amount_usd": "1.00",
+          "max_amount_usd": "1.00"
+        },
+        "claim": {
+          "statement_sha256": "75c5f0786b49ac215b55cbee7ba306e291f781b6141e1026941bdb95fda41d60"
+        },
+        "evidence": [
+          {
+            "type": "guard-report",
+            "content_sha256": "845e91831319e89c4d656bdb80c278ac09a7230d61e5dfd2e1b1fbb436ac8917"
+          }
+        ],
+        "receipts": [
+          {
+            "protocol": "verdict.council-sha256-chain",
+            "chain_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          }
+        ],
+        "boundaries": [],
+        "context": {},
+        "payment": {
+          "gateway": "cloudflare-x402",
+          "amount_usd": "1.00"
+        }
+      },
+      "expected_jcs": "{\"action\":\"proof-bundle\",\"boundaries\":[],\"claim\":{\"statement_sha256\":\"75c5f0786b49ac215b55cbee7ba306e291f781b6141e1026941bdb95fda41d60\"},\"context\":{},\"evidence\":[{\"content_sha256\":\"845e91831319e89c4d656bdb80c278ac09a7230d61e5dfd2e1b1fbb436ac8917\",\"type\":\"guard-report\"}],\"issued_at\":\"2026-07-01T00:00:00Z\",\"payment\":{\"amount_usd\":\"1.00\",\"gateway\":\"cloudflare-x402\"},\"producer\":\"verdict-cli\",\"receipts\":[{\"chain_hash\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"protocol\":\"verdict.council-sha256-chain\"}],\"schema\":\"verdict.proof-packet/v1\",\"subject\":\"meridian\",\"unit\":{\"amount_usd\":\"1.00\",\"currency\":\"USD\",\"id\":\"meridian.api.proof-bundle\",\"max_amount_usd\":\"1.00\",\"method\":\"POST\",\"route\":\"/api/proof-bundle\",\"unit\":\"signed guard-check bundle\"}}",
+      "expected_content_hash": "0ba525d1ac4f9073c6137cf6480a17b0804f176e8737142c7f06642abd26969f",
+      "signature": "8324647195699d847cea419893180c820eb6f4fa0d248fd1b4c8a62ae7903ae59d904399dc84e3041e2e5a068514223acfda5ca225de2c88ec78a948f31b8800",
+      "signer_pubkey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+      "envelope": {
+        "protocol": "VERDICT/v1",
+        "receipt": {
+          "schema": "verdict.proof-packet/v1",
+          "issued_at": "2026-07-01T00:00:00Z",
+          "producer": "verdict-cli",
+          "subject": "meridian",
+          "action": "proof-bundle",
+          "unit": {
+            "id": "meridian.api.proof-bundle",
+            "route": "/api/proof-bundle",
+            "method": "POST",
+            "unit": "signed guard-check bundle",
+            "currency": "USD",
+            "amount_usd": "1.00",
+            "max_amount_usd": "1.00"
+          },
+          "claim": {
+            "statement_sha256": "75c5f0786b49ac215b55cbee7ba306e291f781b6141e1026941bdb95fda41d60"
+          },
+          "evidence": [
+            {
+              "type": "guard-report",
+              "content_sha256": "845e91831319e89c4d656bdb80c278ac09a7230d61e5dfd2e1b1fbb436ac8917"
+            }
+          ],
+          "receipts": [
+            {
+              "protocol": "verdict.council-sha256-chain",
+              "chain_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            }
+          ],
+          "boundaries": [],
+          "context": {},
+          "payment": {
+            "gateway": "cloudflare-x402",
+            "amount_usd": "1.00"
+          }
+        },
+        "content_hash": "0ba525d1ac4f9073c6137cf6480a17b0804f176e8737142c7f06642abd26969f",
+        "signature": "8324647195699d847cea419893180c820eb6f4fa0d248fd1b4c8a62ae7903ae59d904399dc84e3041e2e5a068514223acfda5ca225de2c88ec78a948f31b8800",
+        "signer_pubkey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+      }
+    }
+  ]
+}
