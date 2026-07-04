@@ -25,11 +25,27 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
+    - name: Require VERDICT_CLI_DEPLOY_KEY (private dependency)
+      env:
+        VERDICT_CLI_DEPLOY_KEY: ${{ secrets.VERDICT_CLI_DEPLOY_KEY }}
+      run: |
+        if [ -z "$VERDICT_CLI_DEPLOY_KEY" ]; then
+          echo "::error title=VERDICT_CLI_DEPLOY_KEY secret missing::verdict-cli is a private repo; unauthenticated pip install cannot fetch it. Add the read-only deploy key (read-only deploy-key pattern), then re-run. The job stays red rather than faking a green attestation."
+          exit 1
+        fi
+        echo "VERDICT_CLI_DEPLOY_KEY present — proceeding."
+    - name: Checkout verdict-cli (private, read-only deploy key)
+      uses: actions/checkout@v4
+      with:
+        repository: os1221/verdict-cli
+        ssh-key: ${{ secrets.VERDICT_CLI_DEPLOY_KEY }}
+        path: verdict-cli
     - name: Install verdict-cli[v1]
-      # Mirrors verdict-cli dacedbf: the old file:// template was malformed
-      # (double-escaped `${{ github.workspace}` expression) and the 2>/dev/null
-      # fallback masked it. Install straight from the repo instead.
-      run: pip install "verdict-cli[v1] @ git+https://github.com/os1221/verdict-cli.git"
+      # Install from the checkout, then remove the directory so the extra
+      # untracked tree cannot dirty the attestation's matches_checkout facts.
+      run: |
+        pip install "./verdict-cli[v1]"
+        rm -rf verdict-cli
     - name: Gather build facts
       id: facts
       run: 'python3 -c "
@@ -70,12 +86,30 @@ jobs:
 
         " >> $GITHUB_OUTPUT'
     - name: Verify attestation matches checkout
-      run: "python3 -c \"\nfrom verdict import attest\nimport json, os, sys\nenvelope = json.loads('''${{steps.sign.outputs.envelope}}''')\n\
-        result = attest.verify_build(envelope, '.')\nprint('Verification:', json.dumps(result))\nif not result.get('signature_valid'):\n\
-        \    print('ERROR: Signature verification failed')\n    sys.exit(1)\nif not result.get('matches_checkout'):\n    print('ERROR:\
-        \ Attestation does not match checkout')\n    sys.exit(1)\nprint('Attestation valid and matches checkout')\n\""
+      # Envelope travels via env, never inlined into shell — bash consumes the
+      # JSON's own quotes otherwise (the exact json.decoder failure verdict-cli
+      # fixed in 2dc129d). Same defect class, same env+heredoc cure.
+      env:
+        VERDICT_ENVELOPE: ${{ steps.sign.outputs.envelope }}
+      run: |
+        python3 <<'PYEOF'
+        from verdict import attest
+        import json, os, sys
+        envelope = json.loads(os.environ["VERDICT_ENVELOPE"])
+        result = attest.verify_build(envelope, '.')
+        print('Verification:', json.dumps(result))
+        if not result.get('signature_valid'):
+            print('ERROR: Signature verification failed')
+            sys.exit(1)
+        if not result.get('matches_checkout'):
+            print('ERROR: Attestation does not match checkout')
+            sys.exit(1)
+        print('Attestation valid and matches checkout')
+        PYEOF
     - name: Create attestation file
-      run: echo '${{steps.sign.outputs.envelope}}' > verdict-build-attestation.json
+      env:
+        VERDICT_ENVELOPE: ${{ steps.sign.outputs.envelope }}
+      run: printf '%s\n' "$VERDICT_ENVELOPE" > verdict-build-attestation.json
     - name: Upload attestation artifact
       uses: actions/upload-artifact@v4
       with:
