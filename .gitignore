@@ -3,3 +3,6 @@ node_modules/
 *.bak-*
 .codex-backups/
 .DS_Store
+.codebase-memory/
+os1221-varp-*.tgz
+dist/
