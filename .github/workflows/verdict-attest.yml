@@ -30,7 +30,7 @@ jobs:
         VERDICT_CLI_DEPLOY_KEY: ${{ secrets.VERDICT_CLI_DEPLOY_KEY }}
       run: |
         if [ -z "$VERDICT_CLI_DEPLOY_KEY" ]; then
-          echo "::error title=VERDICT_CLI_DEPLOY_KEY secret missing::verdict-cli is a private repo; unauthenticated pip install cannot fetch it. Add the read-only deploy key (read-only deploy-key pattern), then re-run. The job stays red rather than faking a green attestation."
+          echo "::error title=VERDICT_CLI_DEPLOY_KEY secret missing::verdict-cli is a private dependency; unauthenticated install cannot fetch it. Add the read-only deploy key secret, then re-run. The job stays red rather than faking a green attestation."
           exit 1
         fi
         echo "VERDICT_CLI_DEPLOY_KEY present — proceeding."

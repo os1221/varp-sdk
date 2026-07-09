@@ -40,15 +40,14 @@ breaks).
 - `varp.test.js` — core sign/verify/ledger behavior
 - `conformance.test.js` — cross-language golden vectors
 - `proof-packet.test.js` + vendored `proof_packet_vectors.json`
-- `parity-manifest.test.js` — sha256-pinned fixture drift gate (pins vendored
-  from `parity/manifest.json`)
+- `parity-manifest.test.js` — sha256-pinned fixture drift gate
 - `roundtrip.test.js`, `cli.test.js`, `safe-harbor.test.js` (2026-07,
   safe-harbor verifier behavior)
 
-## Mesh position
+## Cross-language position
 
-varp-sdk is the TS/JS signer leg of the mesh trust spine. Cross-language byte
-parity with verdict-cli (Python), the-court (TS), sports-mcp, and omega-kernel
-verdict-crypto (Rust) is enforced by `parity/check_parity.py`
-via `parity/legs/leg_varp_sdk.mjs`. Canonicalization drift (e.g. shallow-sort
-JCS bugs) is the repeated defect class this guards against.
+varp-sdk is the TypeScript/JavaScript signer+verifier for VERDICT/v1. Byte
+parity with the Python and Rust reference implementations is enforced by
+vendored golden vectors under `src/__fixtures__/` and the parity manifest
+sha256 pins. Canonicalization drift (e.g. shallow-sort JCS bugs) is the
+repeated defect class those gates catch.

@@ -44,7 +44,6 @@ npx @os1221/varp hash "receipts not vibes"
 - Golden vectors vendored at `src/__fixtures__/` (`conformance_vectors.json`,
   `proof_packet_vectors.json`) with sha256 pins in `parity_manifest.json`
   (checked by `src/parity-manifest.test.js`).
-- Mesh-wide byte-parity leg: `parity/legs/leg_varp_sdk.mjs`.
 - Never change hash/signature behavior without golden-vector coverage.
 
 ## Start here
