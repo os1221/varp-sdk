@@ -1,4 +1,4 @@
-// Vector-manifest drift gate (parity harness, repo-local leg).
+// Vector-manifest drift gate (repo-local parity harness).
 //
 // The canonical vector fixtures vendored in src/__fixtures__/ must match the
 // sha256s pinned in src/__fixtures__/parity_manifest.json (vendored from
