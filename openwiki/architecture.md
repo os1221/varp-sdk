@@ -18,9 +18,12 @@ externalized).
    `verdict-cli` byte-for-byte (golden vectors prove it)
 
 Chain integrity: each `LedgerLine` links to the previous via `prev_hash`.
-Note (mesh lesson): `prev_hash` sits OUTSIDE the signed verdict, so chain-link
-integrity is distinct from signature integrity — `verifyLedger` checks both
-and reports them separately.
+Note (mesh lesson): `prev_hash` sits **outside the signed content payload**
+(it is stored on `verdict.prev_hash` by `createVerdictV1`, or top-level
+`line.prev_hash` on some external ledgers), so chain-link integrity is
+distinct from signature integrity — `verifyLedger` checks both and reports
+them separately (`chain_valid` requires all signatures **and** no prev_hash
+breaks).
 
 ## Layers in src/index.ts
 
@@ -32,7 +35,7 @@ and reports them separately.
 | Crypto primitives | `jcsStringify`, `blake3Hex`, `sha256Hex`, `ed25519Verify`, hex helpers |
 | Types | `VerifyResult`, `WarrantPacketVerifyResult`, `VerdictV1Envelope`, `OmegaReceiptEvent/Verdict`, `LedgerLine`, `ProofPacketVerifyResult` |
 
-## Test suite (node --test, 116 passing)
+## Test suite (node --test, 119 passing)
 
 - `varp.test.js` — core sign/verify/ledger behavior
 - `conformance.test.js` — cross-language golden vectors

@@ -4,7 +4,22 @@ All notable changes to `@os1221/varp` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+- **`verifyLedger` chain integrity** — `createVerdictV1` / CLI `sign` store `prev_hash`
+  on `verdict.prev_hash`, but `verifyLedger` only inspected top-level `line.prev_hash`.
+  A forged envelope `prev_hash` previously left `chain_valid: true`. Now both surfaces
+  are checked (regression tests added).
+- README claimed `blake3Hex` had a SHA-256 fallback; implementation correctly refuses
+  silent substitution (safe-harbor). Docs aligned.
+- `gen-dts` omitted `ed25519Verify`, Omega receipt types, and `LedgerLine.prev_hash`.
+- Stale `dist/chunk-*.mjs` artifacts could bloat `npm pack` (~350KB unpacked of dead
+  chunks). Build now starts with a clean `dist/`.
+- Declared `esbuild` as a direct devDependency (was only transitive via tsup).
+- Test typo `deltaScore` → `delta_sv` (silent wrong-key; always used default 0.1).
+
 ### Added
+- CLI `varp verify-proof-packet <packet-or-envelope.json>` for the
+  `verdict.proof-packet/v1` contract.
 - `verifyProofPacket(input)` / `validateProofPacket(packet)` / `PROOF_PACKET_SCHEMA` —
   cross-language verifier for `verdict.proof-packet/v1`, the monetized proof-packet
   wrapper produced by verdict-cli's `verdict.proof_packet` module (a DIFFERENT contract
@@ -19,7 +34,7 @@ All notable changes to `@os1221/varp` are documented here.
   non-ASCII/astral-key/ES-number canonicalization; signed with the PUBLIC RFC 8032 §7.1
   TEST 1 key), consumed by `src/proof-packet.test.js` — the executable proof that a
   packet produced by verdict-cli Python verifies in this SDK.
-- Suite: 114 tests (was 89).
+- Suite: 119 tests (was 116 after proof-packet; was 89 before that).
 
 ## [1.0.0] — 2026-06-27
 
@@ -29,7 +44,7 @@ All notable changes to `@os1221/varp` are documented here.
 - `createVerdictV1(opts)` — sign a new VERDICT/v1 receipt with an Ed25519 private key
 - `hashContent(text)` — BLAKE3-hash a string, returning hex (convenience wrapper)
 - `jcsStringify(val)` — RFC 8785 deterministic JSON serialisation
-- `blake3Hex(data)` — BLAKE3 with SHA-256 fallback for environments without the noble/hashes build
+- `blake3Hex(data)` — BLAKE3 content hash (SHA-256 fallback was later **removed**; refuse silent substitution)
 - `hexToBytes` / `bytesToHex` — hex encoding utilities
 - **`varp` CLI** — `verify`, `verify-ledger`, `hash`, `help` commands via `npx @os1221/varp`
 - 26 tests across 10 suites including CLI subprocess smoke tests and a known BLAKE3 test vector

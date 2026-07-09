@@ -19,6 +19,7 @@ import {
   verifyReceipt,
   verifyLedger,
   verifyWarrantProofPacket,
+  verifyProofPacket,
   hashContent,
   createVerdictV1,
 } from "./index.js";
@@ -85,6 +86,20 @@ async function main() {
       const result = await verifyWarrantProofPacket(packet, reportRaw);
       console.log(JSON.stringify(result, null, 2));
       process.exit(result.verified ? 0 : 1);
+    }
+
+    case "verify-proof-packet": {
+      const path = args[0];
+      if (!path) { die("Usage: varp verify-proof-packet <packet-or-envelope.json>"); }
+      const raw = JSON.parse(readFileSync(path, "utf8"));
+      try {
+        const result = await verifyProofPacket(raw);
+        console.log(JSON.stringify(result, null, 2));
+        process.exit(result.valid ? 0 : 1);
+      } catch (e) {
+        console.error(`✗ ${e instanceof Error ? e.message : String(e)}`);
+        process.exit(1);
+      }
     }
 
     case "chain-report": {
@@ -248,6 +263,8 @@ Commands:
   varp verify-ledger <ledger.jsonl> Verify all receipts in a JSONL ledger
   varp verify-warrant-packet <proof-packet.json> <report.json>
                                     Verify public Meridian/Warrant packet + report fixtures
+  varp verify-proof-packet <packet-or-envelope.json>
+                                    Verify verdict.proof-packet/v1 (raw packet or signed envelope)
   varp chain-report <ledger.jsonl>  Check prev_hash chain linkage (chain integrity audit)
   varp summarize <ledger.jsonl>     Show receipt count, agents, date range, top agents
   varp sign --agent <name> --desc <text> --key <hex64>

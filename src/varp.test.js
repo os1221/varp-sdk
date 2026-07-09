@@ -35,7 +35,7 @@ describe("VARP SDK — @os1221/varp", () => {
     sampleReceipt = await createVerdictV1({
       agent: "TestAgent",
       description: "unit test receipt",
-      deltaScore: 0.1,
+      delta_sv: 0.1,
       privateKeyHex: TEST_PRIV,
     });
   });
@@ -120,7 +120,7 @@ describe("VARP SDK — @os1221/varp", () => {
       const r2 = await createVerdictV1({
         agent: "TestAgent2",
         description: "second receipt",
-        deltaScore: 0.2,
+        delta_sv: 0.2,
         privateKeyHex: TEST_PRIV,
       });
       const jsonl = [JSON.stringify(sampleReceipt), JSON.stringify(r2)].join("\n");
@@ -136,6 +136,57 @@ describe("VARP SDK — @os1221/varp", () => {
       const result = await verifyLedger(jsonl);
       assert.equal(result.results[0].verified, false);
       assert.equal(result.results[1].verified, true);
+    });
+
+    it("detects forged verdict.prev_hash (createVerdictV1 surface)", async () => {
+      const r1 = await createVerdictV1({
+        agent: "ChainA",
+        description: "root",
+        privateKeyHex: TEST_PRIV,
+      });
+      const r2 = await createVerdictV1({
+        agent: "ChainA",
+        description: "forged link",
+        privateKeyHex: TEST_PRIV,
+        prevHash: "deadbeef".repeat(8),
+      });
+      assert.equal(r2.verdict.prev_hash, "deadbeef".repeat(8));
+      assert.equal(r2.prev_hash, undefined, "SDK places prev_hash on verdict, not top-level");
+      const result = await verifyLedger([JSON.stringify(r1), JSON.stringify(r2)].join("\n"));
+      assert.equal(result.results.every((r) => r.verified), true, "signatures still valid");
+      assert.equal(result.chain_valid, false, "forged prev_hash must fail chain_valid");
+    });
+
+    it("accepts a correctly linked verdict.prev_hash chain", async () => {
+      const r1 = await createVerdictV1({
+        agent: "ChainA",
+        description: "root",
+        privateKeyHex: TEST_PRIV,
+      });
+      const r2 = await createVerdictV1({
+        agent: "ChainA",
+        description: "linked",
+        privateKeyHex: TEST_PRIV,
+        prevHash: r1.verdict.event_hash,
+      });
+      const result = await verifyLedger([JSON.stringify(r1), JSON.stringify(r2)].join("\n"));
+      assert.equal(result.chain_valid, true);
+    });
+
+    it("also honors top-level line.prev_hash for external ledgers", async () => {
+      const r1 = await createVerdictV1({
+        agent: "ChainB",
+        description: "root",
+        privateKeyHex: TEST_PRIV,
+      });
+      const r2 = await createVerdictV1({
+        agent: "ChainB",
+        description: "external style",
+        privateKeyHex: TEST_PRIV,
+      });
+      r2.prev_hash = "cafebabe".repeat(8);
+      const result = await verifyLedger([JSON.stringify(r1), JSON.stringify(r2)].join("\n"));
+      assert.equal(result.chain_valid, false);
     });
   });
 

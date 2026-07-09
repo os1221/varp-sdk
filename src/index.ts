@@ -246,16 +246,23 @@ export async function verifyLedger(jsonlText: string): Promise<{
   // Chain tracking: prev_hash starts as undefined (genesis).
   // Only tracks records that have an explicit prev_hash field — VERDICT/v1 records
   // without prev_hash are treated as chain-independent and don't break the chain.
+  //
+  // Location of prev_hash (both supported):
+  //   - createVerdictV1 / CLI sign → verdict.prev_hash (on the envelope object)
+  //   - some older / external ledgers → top-level line.prev_hash
+  // chain-report CLI reads verdict.prev_hash; verifyLedger MUST match that surface
+  // or a forged prev_hash on signed envelopes is silently ignored (chain_valid:true).
   let expectedPrev: string | undefined = undefined;
   const chainBreaks = new Set<number>();
   for (const { idx, line } of parsed) {
     if (!line) { expectedPrev = undefined; continue; }
     // Skip null-verdict lines — Rust audit uses continue on parse error for these.
     if (line.verdict == null) continue;
-    const ev = line.verdict?.["event"] as Record<string, unknown> | undefined;
-    const thisHash = (ev?.["hash"] ?? line.verdict?.event_hash) as string | undefined;
-    if (line.prev_hash != null) {
-      const prevToCheck = line.prev_hash ?? undefined;
+    const v = line.verdict as Record<string, unknown> | undefined;
+    const ev = v?.["event"] as Record<string, unknown> | undefined;
+    const thisHash = (ev?.["hash"] ?? v?.["event_hash"]) as string | undefined;
+    const prevToCheck = (line.prev_hash ?? v?.["prev_hash"]) as string | undefined | null;
+    if (prevToCheck != null) {
       if (prevToCheck !== expectedPrev) chainBreaks.add(idx);
     }
     if (thisHash !== undefined) expectedPrev = thisHash;

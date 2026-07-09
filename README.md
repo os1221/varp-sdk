@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/@os1221/varp)](https://www.npmjs.com/package/@os1221/varp)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![tests](https://img.shields.io/badge/tests-58%20passing-brightgreen)](src/varp.test.js)
+[![tests](https://img.shields.io/badge/tests-119%20passing-brightgreen)](src/)
 [![cli](https://img.shields.io/badge/cli-varp-blue)]()
 
 **Verifiable AI Receipt Protocol** — cryptographic provenance for every AI agent action.
@@ -40,9 +40,18 @@ npx @os1221/varp verify-ledger receipts.jsonl
 # Verify a public Meridian/Warrant proof packet against its report fixture
 npx @os1221/varp verify-warrant-packet proof-packet.fixture.json report.fixture.json
 
+# Verify a verdict.proof-packet/v1 (raw packet or signed envelope)
+npx @os1221/varp verify-proof-packet packet-or-envelope.json
+
 # Hash any string with BLAKE3
 npx @os1221/varp hash "receipts not vibes"
 # → f38f885d7d1bfb8f404c1e1974c07f959a47449e5abe09b18575fbd35e8a1e7d
+
+# Sign / keygen / ledger inspect
+npx @os1221/varp keygen
+npx @os1221/varp sign --agent MyAgent --desc "task done" --key <hex64>
+npx @os1221/varp summarize receipts.jsonl
+npx @os1221/varp chain-report receipts.jsonl
 ```
 
 ## Quick start
@@ -83,8 +92,11 @@ Verify all receipts in a JSONL ledger string. Checks each line and validates `pr
 ### `verifyWarrantProofPacket(packet, reportTextOrObject): Promise<WarrantPacketVerifyResult>`
 Verify public Meridian/Warrant proof-packet metadata against the exact public report fixture. It checks the report SHA-256 hash, coverage hash, repo/preflight counts, receipt event hash, and the public redaction state for the private Omega ledger.
 
+### `verifyProofPacket(input): Promise<ProofPacketVerifyResult>` / `validateProofPacket(packet)`
+Cross-language verifier for `verdict.proof-packet/v1` (the monetized packet from `verdict-cli` — a **different** contract from Meridian warrant packets). Accepts a raw packet, `{ packet }`, a signed VERDICT/v1 envelope, or `{ envelope }`. Envelopes verify `BLAKE3(JCS(receipt))` and Ed25519 over the content-hash hex.
+
 ### `createVerdictV1(opts: SignOptions): Promise<LedgerLine>`
-Sign a new VERDICT/v1 receipt with an Ed25519 private key. Computes BLAKE3(JCS(body)) as `event_hash`.
+Sign a new VERDICT/v1 receipt with an Ed25519 private key. Computes BLAKE3(JCS(body)) as `event_hash`. Optional `prevHash` is stored on `verdict.prev_hash` (outside the signed content payload) for chain linkage; `verifyLedger` checks it.
 
 ### `hashContent(text: string): Promise<string>`
 BLAKE3-hash a string, returning hex. Convenience wrapper for string inputs.
@@ -97,8 +109,12 @@ const hex = await hashContent("receipts not vibes");
 ### Utilities
 - `hexToBytes(hex: string): Uint8Array`
 - `bytesToHex(bytes: Uint8Array): string`
-- `jcsStringify(val: unknown): string` — RFC 8785 deterministic JSON
-- `blake3Hex(data: Uint8Array): Promise<string>` — BLAKE3 with SHA-256 fallback
+- `jcsStringify(val: unknown): string` — RFC 8785 deterministic JSON (key-sorted; golden-vector locked)
+- `blake3Hex(data: Uint8Array): Promise<string>` — BLAKE3 only (refuses silent SHA-256 substitution)
+- `sha256Hex(data: Uint8Array): Promise<string>` — used for warrant report evidence hashes, not VERDICT content hashes
+- `ed25519Verify(sigHex, message, pubHex): Promise<boolean>` — raw Ed25519 verify for browser verifiers
+- `getPublicKey(privateKeyHex): Promise<string>`
+- `parseLedger(jsonlText): LedgerLine[]`
 
 ## Receipt format (VERDICT/v1)
 

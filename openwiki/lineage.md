@@ -11,10 +11,11 @@
 
 ## Mesh device presence
 
-Not independently re-verified this pass. Published to npm per its own first
-commit message ("add README.md for npm publish"), meaning its actual runtime
-footprint is wherever it gets installed as a dependency, not tied to one mesh
-device.
+Not independently re-verified this pass. **npm status (2026-07-09):**
+`@os1221/varp` is **not yet on the public registry** (`npm view` → 404).
+`PUBLISH_README.md` + package metadata are publish-ready; human must run
+`npm publish --access public` after 2FA login. Runtime footprint today is
+git clone / local `npm pack`, not a global install base.
 
 ## Relation to mesh timeline
 

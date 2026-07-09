@@ -5,8 +5,9 @@
 > fails on structured content blocks. Commands below were actually run.
 
 `@os1221/varp` — **Verifiable AI Receipt Protocol** SDK + CLI (TypeScript,
-npm-published, MIT). Signs AI agent actions with Ed25519 + BLAKE3 + JCS
-(RFC 8785) into an append-only, tamper-evident chain; verifies fully offline.
+MIT; package metadata publish-ready, **not yet on npm registry as of 2026-07-09**).
+Signs AI agent actions with Ed25519 + BLAKE3 + JCS (RFC 8785) into an
+append-only, tamper-evident chain; verifies fully offline.
 
 ## Build & test (verified 2026-07-04)
 

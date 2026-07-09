@@ -41,11 +41,27 @@ export interface VerdictV1Envelope {
   evidence_root?: string;
 }
 
+export interface OmegaReceiptEvent {
+  timestamp?: string;
+  description?: string;
+  delta_sv?: number;
+  hash?: string;
+  [key: string]: unknown;
+}
+
+export interface OmegaReceiptVerdict {
+  event?: OmegaReceiptEvent;
+  signature_hex?: string;
+  signer_pubkey_hex?: string;
+  [key: string]: unknown;
+}
+
 export interface LedgerLine {
-  verdict?: VerdictV1Envelope;
+  verdict?: VerdictV1Envelope | OmegaReceiptVerdict;
   event_hash?: string;
   signature?: string;
   signer_pubkey?: string;
+  prev_hash?: string;
   [key: string]: unknown;
 }
 
@@ -94,6 +110,11 @@ export declare function createVerdictV1(opts: SignOptions): Promise<LedgerLine>;
 export declare function hexToBytes(hex: string): Uint8Array;
 export declare function bytesToHex(bytes: Uint8Array): string;
 export declare function hashContent(text: string): Promise<string>;
+export declare function ed25519Verify(
+  signatureHex: string,
+  message: Uint8Array | string,
+  publicKeyHex: string,
+): Promise<boolean>;
 export declare function getPublicKey(privateKeyHex: string): Promise<string>;
 export declare function parseLedger(text: string): LedgerLine[];
 export declare function jcsStringify(val: unknown): string;

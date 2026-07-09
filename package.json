@@ -16,16 +16,27 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts src/cli.ts --format cjs,esm && node scripts/gen-dts.js && npm run build:browser",
+    "build": "rm -rf dist && tsup src/index.ts src/cli.ts --format cjs,esm && node scripts/gen-dts.js && npm run build:browser",
     "build:browser": "esbuild src/index.ts --bundle --format=esm --platform=browser --external:node:crypto --outfile=dist/varp.browser.mjs && esbuild src/index.ts --bundle --format=iife --global-name=VARP --platform=browser --external:node:crypto --outfile=dist/varp.browser.js",
     "pretest": "npm run build",
     "test": "node --test src/*.test.js",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
-    "ai-receipt", "varp", "ed25519", "blake3", "jcs", "verdict",
-    "verifiable-ai", "provenance", "audit-trail", "eu-ai-act",
-    "receipts-not-vibes", "cryptographic", "ledger", "cli"
+    "ai-receipt",
+    "varp",
+    "ed25519",
+    "blake3",
+    "jcs",
+    "verdict",
+    "verifiable-ai",
+    "provenance",
+    "audit-trail",
+    "eu-ai-act",
+    "receipts-not-vibes",
+    "cryptographic",
+    "ledger",
+    "cli"
   ],
   "author": "Omair Shahid <omairshahid21@gmail.com> (https://os1221.com)",
   "license": "MIT",
@@ -43,8 +54,14 @@
     "@noble/hashes": "^1.8.0"
   },
   "devDependencies": {
+    "esbuild": "^0.25.12",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0"
   },
-  "files": ["dist", "README.md", "LICENSE", "CHANGELOG.md"]
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ]
 }
