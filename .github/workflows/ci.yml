@@ -1,20 +1,40 @@
 name: CI
-# Enforce the SDK's own test suite (71 tests incl. the canonical VERDICT/v1
-# conformance vectors) on push/PR. pretest builds dist via tsup.
+# Enforce the SDK's own suite, including canonical VERDICT/v1 conformance
+# vectors and release-contract tests. pretest builds dist via tsup.
 'on':
   push:
     branches: [main]
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - node-version: '18'
+            suite: runtime
+          - node-version: '24'
+            suite: full
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          node-version: '20'
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
       - run: npm ci
-      - run: npm test
+      - name: Build for the declared minimum runtime
+        if: matrix.suite == 'runtime'
+        run: npm run build
+      - name: Run the complete source suite
+        if: matrix.suite == 'full'
+        run: npm test
+      - name: Smoke the built CJS, ESM, and CLI surfaces
+        run: npm run test:runtime

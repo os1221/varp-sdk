@@ -2,7 +2,7 @@
 
 [![registry](https://img.shields.io/badge/npm-bootstrap%20pending-orange)](https://github.com/os1221/varp-sdk/blob/main/PUBLISH_README.md)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![tests](https://img.shields.io/badge/tests-119%20passing-brightgreen)](src/)
+[![CI](https://github.com/os1221/varp-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/os1221/varp-sdk/actions/workflows/ci.yml)
 [![cli](https://img.shields.io/badge/cli-varp-blue)]()
 
 **Verifiable AI Receipt Protocol** — cryptographic provenance for every AI agent action.

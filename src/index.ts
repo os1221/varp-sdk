@@ -119,8 +119,31 @@ async function blake3Hex(data: Uint8Array): Promise<string> {
 }
 
 async function sha256Hex(data: Uint8Array): Promise<string> {
-  const hash = await crypto.subtle.digest("SHA-256", data);
+  let subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    ({ subtle } = (await import("node:crypto")).webcrypto);
+  }
+  const hash = await subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function loadEd25519() {
+  const ed = await import("@noble/ed25519");
+  if (!ed.etc.sha512Sync || !globalThis.crypto?.subtle) {
+    try {
+      const { createHash } = await import("node:crypto");
+      const sha512Sync = (...msgs: Uint8Array[]) => {
+        const hash = createHash("sha512");
+        for (const msg of msgs) hash.update(msg);
+        return hash.digest();
+      };
+      if (!ed.etc.sha512Sync) ed.etc.sha512Sync = sha512Sync;
+      if (!globalThis.crypto?.subtle) {
+        ed.etc.sha512Async = async (...msgs: Uint8Array[]) => sha512Sync(...msgs);
+      }
+    } catch { /* browser Web Crypto remains available for async operations */ }
+  }
+  return ed;
 }
 
 // ── Content payload extraction ───────────────────────────────────────────────
@@ -210,7 +233,7 @@ export async function verifyReceipt(line: LedgerLine): Promise<VerifyResult> {
 
   // Step 2: Verify Ed25519 signature over the hash
   try {
-    const { verifyAsync } = await import("@noble/ed25519");
+    const { verifyAsync } = await loadEd25519();
     const sigBytes = hexToBytes(sig);
     const pubBytes = hexToBytes(pub);
     const msgBytes = new TextEncoder().encode(hash.toLowerCase());
@@ -299,18 +322,7 @@ export interface SignOptions {
  * privateKeyHex: 64-char hex Ed25519 seed (first 32 bytes of keypair).
  */
 export async function createVerdictV1(opts: SignOptions): Promise<LedgerLine> {
-  const ed = await import("@noble/ed25519");
-  // Noble/ed25519 requires sha512Sync in non-browser environments
-  if (!ed.etc.sha512Sync) {
-    try {
-      const { createHash } = await import("node:crypto");
-      ed.etc.sha512Sync = (...msgs: Uint8Array[]) => {
-        const h = createHash("sha512");
-        for (const m of msgs) h.update(m);
-        return h.digest();
-      };
-    } catch { /* browser env — async only */ }
-  }
+  const ed = await loadEd25519();
   const { sign, getPublicKey } = ed;
   const privBytes = hexToBytes(opts.privateKeyHex);
   const pubBytes = getPublicKey(privBytes);
@@ -382,7 +394,7 @@ export async function ed25519Verify(
   message: Uint8Array | string,
   publicKeyHex: string,
 ): Promise<boolean> {
-  const { verifyAsync } = await import("@noble/ed25519");
+  const { verifyAsync } = await loadEd25519();
   const msgBytes = typeof message === "string" ? new TextEncoder().encode(message) : message;
   try {
     return await verifyAsync(hexToBytes(signatureHex), msgBytes, hexToBytes(publicKeyHex));
@@ -748,7 +760,7 @@ async function verifyV1EnvelopeSignature(envelope: Record<string, unknown>): Pro
   try {
     const recomputed = await blake3Hex(new TextEncoder().encode(jcsStringify(receipt)));
     if (recomputed !== claimed) return false;
-    const { verifyAsync } = await import("@noble/ed25519");
+    const { verifyAsync } = await loadEd25519();
     return await verifyAsync(
       hexToBytes(sig),
       new TextEncoder().encode(claimed),
@@ -819,17 +831,7 @@ export async function verifyProofPacket(input: unknown): Promise<ProofPacketVeri
  * without needing to create a receipt.
  */
 export async function getPublicKey(privateKeyHex: string): Promise<string> {
-  const ed = await import("@noble/ed25519");
-  if (!ed.etc.sha512Sync) {
-    try {
-      const { createHash } = await import("node:crypto");
-      ed.etc.sha512Sync = (...msgs: Uint8Array[]) => {
-        const h = createHash("sha512");
-        for (const m of msgs) h.update(m);
-        return h.digest();
-      };
-    } catch { /* browser */ }
-  }
+  const ed = await loadEd25519();
   const privBytes = hexToBytes(privateKeyHex);
   const pubBytes = ed.getPublicKey(privBytes);
   return bytesToHex(pubBytes);
