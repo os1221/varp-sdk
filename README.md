@@ -1,13 +1,13 @@
 # @os1221/varp
 
-[![npm](https://img.shields.io/npm/v/@os1221/varp)](https://www.npmjs.com/package/@os1221/varp)
+[![registry](https://img.shields.io/badge/npm-bootstrap%20pending-orange)](https://github.com/os1221/varp-sdk/blob/main/PUBLISH_README.md)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![tests](https://img.shields.io/badge/tests-119%20passing-brightgreen)](src/)
 [![cli](https://img.shields.io/badge/cli-varp-blue)]()
 
 **Verifiable AI Receipt Protocol** — cryptographic provenance for every AI agent action.
 
-Sign any AI decision with Ed25519 + BLAKE3 + JCS (RFC 8785). Build an append-only, tamper-evident audit chain. Verify the full history offline with no cloud dependency. Designed for EU AI Act Article 13/14/22 compliance and agentic systems that need to prove what happened.
+Sign any AI decision with Ed25519 + BLAKE3 + JCS (RFC 8785). Build an append-only, tamper-evident audit chain. Verify the full history offline with no cloud dependency. The resulting evidence can support transparency, record-keeping, and audit workflows; this library does not by itself make a system legally compliant.
 
 ## Why VARP?
 
@@ -22,11 +22,25 @@ VARP is the receipt format. This library is the verifier + signer. Zero infrastr
 
 ## Install
 
+> **Registry status (2026-07-12):** `@os1221/varp` has not completed its first npm registry publish yet. The registry command below becomes valid only after the [one-time bootstrap](https://github.com/os1221/varp-sdk/blob/main/PUBLISH_README.md). It is shown as the intended stable install surface, not as a claim that the package is already downloadable.
+
+After the first registry release:
+
 ```bash
 npm install @os1221/varp
 ```
 
 Node ≥ 18. ESM + CJS exports. No native binaries. Includes a `varp` CLI.
+
+Until then, verify the public source checkout directly:
+
+```bash
+git clone https://github.com/os1221/varp-sdk.git
+cd varp-sdk
+npm ci
+npm test
+npm pack --dry-run
+```
 
 ## CLI
 

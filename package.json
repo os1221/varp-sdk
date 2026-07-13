@@ -1,7 +1,7 @@
 {
   "name": "@os1221/varp",
   "version": "1.0.0",
-  "description": "Verifiable AI Receipt Protocol (VARP) — Ed25519 + BLAKE3 + JCS signed receipts for AI provenance. EU AI Act Article 13 compliance.",
+  "description": "Verifiable AI Receipt Protocol (VARP) — Ed25519 + BLAKE3 + JCS signed receipts for AI provenance and audit evidence.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -20,6 +20,9 @@
     "build:browser": "esbuild src/index.ts --bundle --format=esm --platform=browser --external:node:crypto --outfile=dist/varp.browser.mjs && esbuild src/index.ts --bundle --format=iife --global-name=VARP --platform=browser --external:node:crypto --outfile=dist/varp.browser.js",
     "pretest": "npm run build",
     "test": "node --test src/*.test.js",
+    "verify:package": "node scripts/verify-pack.cjs",
+    "release:verify-npm": "node scripts/verify-npm-version.cjs",
+    "release:verify": "node scripts/verify-release.cjs",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -48,6 +51,10 @@
   "funding": "https://os1221.com",
   "engines": {
     "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
     "@noble/ed25519": "^2.3.0",
