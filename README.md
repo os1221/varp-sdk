@@ -14,7 +14,7 @@ Sign any AI decision with Ed25519 + BLAKE3 + JCS (RFC 8785). Build an append-onl
 AI agents take consequential actions — running code, sending messages, calling APIs. When something goes wrong (or right), you need to prove:
 
 - **What** happened (description, agent name)
-- **When** (cryptographically-timestamped, not just logged)
+- **When claimed by the signer** (the supplied timestamp is signature-bound and tampering is detectable, but it is not independently time-attested)
 - **That the record hasn't been altered** (BLAKE3 content hash + Ed25519 signature)
 - **Chain integrity** — each receipt links to the previous via `prev_hash`
 
@@ -177,6 +177,7 @@ Expected success shape:
 - **Attributable**: Ed25519 signature ties each receipt to a specific key pair you control.
 - **Chain-linked**: `prev_hash` creates an ordered hash chain. Inserting, deleting, or reordering receipts is detectable.
 - **Offline-verifiable**: No network calls needed to verify a ledger. All primitives are self-contained.
+- **Timestamp semantics**: The signer-supplied timestamp is part of the signed receipt, so changing it breaks verification. VARP alone does not prove that the claimed time was correct; independent time attestation requires an external trusted timestamp or transparency service.
 
 ## Live demo
 
