@@ -1,5 +1,5 @@
 {
-  "_comment": "VERDICT/v1 conformance vectors. Any language port (Python/TS/Go) MUST reproduce content_hash byte-identically by: (1) JCS-canonicalizing `receipt` per RFC 8785, (2) BLAKE3-256 of the canonical UTF-8 bytes, (3) lowercase hex. This is what makes third-party verification possible and is the published proof that the format is implementation-independent. minimal_approve vector is REAL (generated 2026-06-07, verified via /api/verify). council_consensus_deny vector is also REAL: its Ed25519 signature round-trips verify=true (confirmed 2026-06-09 by verdict-crypto/tests/conformance.rs on MBP). NOTE: JCS canonicalization is LIVE in this crate (hash_payload uses serde_jcs::to_string, lib.rs); the content_hash recompute (JCS->BLAKE3) passes locally — content_hash_recompute_matches_golden is green on MBP. The earlier 'non-canonical serde_json / re-verify on NOMAD' caveat is obsolete since the serde_jcs cutover.",
+  "_comment": "VERDICT/v1 conformance vectors. Any language port (Python/TS/Go) MUST reproduce content_hash byte-identically by: (1) JCS-canonicalizing `receipt` per RFC 8785, (2) BLAKE3-256 of the canonical UTF-8 bytes, (3) lowercase hex. This is what makes third-party verification possible and is the published proof that the format is implementation-independent. minimal_approve vector is REAL (generated 2026-06-07, verified via /api/verify). council_consensus_deny vector is also REAL: its Ed25519 signature round-trips verify=true (confirmed 2026-06-09 by verdict-crypto/tests/conformance.rs on the reference implementation). NOTE: JCS canonicalization is LIVE in this crate (hash_payload uses serde_jcs::to_string, lib.rs); the content_hash recompute (JCS->BLAKE3) passes locally — content_hash_recompute_matches_golden is green. The earlier 'non-canonical serde_json / re-verify' caveat is obsolete since the serde_jcs cutover.",
   "spec": "verdict/v1",
   "canonicalization": "RFC 8785 (JCS)",
   "hash": "blake3-256, lowercase hex (64 chars)",
@@ -27,7 +27,7 @@
       "signer_pubkey": "c49ad2c6d81e6de8353a2bc13763db6b437e68eacf2105787b89042380bd97b9",
       "signature": "e27cc5b8f81af3f52773f3e4e306686f1510dc31cd22d8f345c648d62e4c37567b5666ac8a9d3ee426750a4c2a16877c888f9c474edb3e9685ebcbe39798550e",
       "key_id": "os1221-2026-q2",
-      "_note": "Golden values generated 2026-06-07 via @noble/ed25519 + @noble/hashes/blake3 on NOMAD. Verified round-trip via POST /api/verify → {valid:true, hash_ok:true, sig_ok:true}."
+      "_note": "Golden values generated 2026-06-07 via @noble/ed25519 + @noble/hashes/blake3. Verified round-trip via POST /api/verify → {valid:true, hash_ok:true, sig_ok:true}."
     },
     {
       "name": "council_consensus_deny",
@@ -65,7 +65,7 @@
       "signer_pubkey": "303a74afe672390accc92b00da907a7cb0a8d1da71e484808af8d751bd6aa21c",
       "signature": "fc8dd8a8859b6c00f3d1538bb0dde7410a92e06fb7fd1f3aaa81c46a57a5dda6a8b5d6d2f34003f983f5edc5bb24caadc7177b5bfc69b5f795c75ca258fde905",
       "key_id": "nomad-2026-q2",
-      "_note": "Golden values generated 2026-06-07 via @noble/ed25519 + @noble/hashes/blake3 on NOMAD. Verified round-trip via POST /api/verify → {valid:true, hash_ok:true, sig_ok:true}. Note: signature is over UTF-8 bytes of the content_hash hex string (matches verifier protocol)."
+      "_note": "Golden values generated 2026-06-07 via @noble/ed25519 + @noble/hashes/blake3. Verified round-trip via POST /api/verify → {valid:true, hash_ok:true, sig_ok:true}. Note: signature is over UTF-8 bytes of the content_hash hex string (matches verifier protocol)."
     },
     {
       "name": "tamper_detection_negative",
